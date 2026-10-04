@@ -28,29 +28,30 @@ class OgrenmeMetoduSecici extends ConsumerWidget {
           return Container(
             margin: const EdgeInsets.only(bottom: 10),
             decoration: BoxDecoration(
-              color: isSelected ? const Color(0xFFEEF2FF) : Colors.white,
+              color: isSelected ? context.colors.primary.withValues(alpha: 0.10) : context.colors.surface,
               borderRadius: BorderRadius.circular(18),
-              border: Border.all(
-                color: isSelected ? context.colors.primary : context.colors.border,
-              ),
+              border: Border.all(color: isSelected ? context.colors.primary : context.colors.border),
             ),
-            child: ListTile(
-              onTap: () {
-                HapticFeedback.lightImpact();
-                ref.read(profilProvider.notifier).guncelleMetod(metod);
-              },
-              leading: Icon(Icons.psychology_alt_rounded, size: 26, color: context.colors.primary),
-              title: Text(
-                info['isim'] ?? '',
-                style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: context.colors.textPrimary),
+            child: Material(
+              type: MaterialType.transparency,
+              child: ListTile(
+                onTap: () {
+                  HapticFeedback.lightImpact();
+                  ref.read(profilProvider.notifier).guncelleMetod(metod);
+                },
+                leading: Icon(Icons.psychology_alt_rounded, size: 26, color: context.colors.primary),
+                title: Text(
+                  info['isim'] ?? '',
+                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: context.colors.textPrimary),
+                ),
+                subtitle: Text(
+                  info['aciklama'] ?? '',
+                  style: TextStyle(fontSize: 12, color: context.colors.textMuted),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                trailing: isSelected ? Icon(Icons.check_circle_rounded, color: context.colors.primary) : null,
               ),
-              subtitle: Text(
-                info['aciklama'] ?? '',
-                style: TextStyle(fontSize: 12, color: context.colors.textMuted),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-              trailing: isSelected ? Icon(Icons.check_circle_rounded, color: context.colors.primary) : null,
             ),
           );
         }),

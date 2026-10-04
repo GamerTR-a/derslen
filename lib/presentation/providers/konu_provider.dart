@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../core/constants/sinif_mufredati.dart';
 import '../../core/constants/yks_data.dart';
 import '../../core/storage/analiz_kayitlari.dart';
 import '../../core/storage/storage_service.dart';
@@ -10,8 +11,18 @@ import 'profil_provider.dart';
 
 const String _konularStorageKey = 'konular_user_state';
 
-/// Kullanıcının geçerli müfredatı: (serbest modda değilse) gizlenmemiş hazır
-/// YKS konuları + kullanıcının eklediği konular; tamamlandı/zayıf işaretleriyle.
+/// Profile göre hazır (uygulamanın sunduğu) müfredat: serbest modda boş, 9-11.
+/// sınıflarda o sınıfın Maarif Modeli konuları, diğerlerinde YKS konuları.
+List<Konu> hazirMufredat(String? hedefBolum, String? sinifSeviyesi) {
+  if (hedefBolum == serbestMufredat) return const [];
+  final sinif = araSinif(sinifSeviyesi);
+  if (sinif != null) return [for (final k in sinifKonulari(sinif)) k.konu];
+  return tumKonular;
+}
+
+/// Kullanıcının geçerli müfredatı: gizlenmemiş hazır konular (sınıfa göre
+/// Maarif ya da YKS) + kullanıcının eklediği konular; tamamlandı/zayıf
+/// işaretleriyle.
 class KonuNotifier extends StateNotifier<List<Konu>> {
   final StorageService _storageService;
   final Ref _ref;
@@ -39,11 +50,10 @@ class KonuNotifier extends StateNotifier<List<Konu>> {
   void yenidenKur() {
     if (!mounted) return;
     final m = _ref.read(mufredatProvider);
-    final serbest = _ref.read(profilProvider).value?.hedefBolum == serbestMufredat;
+    final profil = _ref.read(profilProvider).value;
     final temel = [
-      if (!serbest)
-        for (final k in tumKonular)
-          if (!m.gizliIdler.contains(k.id)) k,
+      for (final k in hazirMufredat(profil?.hedefBolum, profil?.sinifSeviyesi))
+        if (!m.gizliIdler.contains(k.id)) k,
       ...m.ozelKonular,
     ];
     state = [
@@ -100,8 +110,14 @@ final konuProvider = StateNotifierProvider<KonuNotifier, List<Konu>>((ref) {
   final storage = ref.watch(storageServiceProvider);
   final n = KonuNotifier(storage, ref);
   ref.listen(mufredatProvider, (_, _) => n.yenidenKur());
-  ref.listen(profilProvider.select((p) => p.value?.hedefBolum), (_, _) => n.yenidenKur());
+  ref.listen(profilProvider.select((p) => (p.value?.hedefBolum, p.value?.sinifSeviyesi)), (_, _) => n.yenidenKur());
   return n;
+});
+
+/// Öğrencinin (gizlemeden önceki) hazır müfredatı.
+final hazirMufredatProvider = Provider<List<Konu>>((ref) {
+  final p = ref.watch(profilProvider.select((p) => (p.value?.hedefBolum, p.value?.sinifSeviyesi)));
+  return hazirMufredat(p.$1, p.$2);
 });
 
 // Helper provider: Sinav alanına göre hazır (YKS) konular

@@ -10,12 +10,7 @@ import '../../providers/settings_provider.dart';
 class AyarlarScreen extends ConsumerWidget {
   const AyarlarScreen({super.key});
 
-  static const _textScaleOptions = [
-    (0.85, 'Küçük'),
-    (1.0, 'Normal'),
-    (1.15, 'Büyük'),
-    (1.3, 'Çok Büyük'),
-  ];
+  static const _textScaleOptions = [(0.85, 'Küçük'), (1.0, 'Normal'), (1.15, 'Büyük'), (1.3, 'Çok Büyük')];
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -25,9 +20,7 @@ class AyarlarScreen extends ConsumerWidget {
 
     return Scaffold(
       backgroundColor: colors.background,
-      appBar: AppBar(
-        title: const Text('Ayarlar'),
-      ),
+      appBar: AppBar(title: const Text('Ayarlar')),
       body: ListView(
         padding: const EdgeInsets.all(20),
         children: [
@@ -35,7 +28,10 @@ class AyarlarScreen extends ConsumerWidget {
             title: 'Görünüm',
             icon: Icons.palette_outlined,
             children: [
-              Text('Tema', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: colors.textSecondary)),
+              Text(
+                'Tema',
+                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: colors.textSecondary),
+              ),
               const SizedBox(height: 10),
               SegmentedButton<ThemeMode>(
                 segments: const [
@@ -62,61 +58,72 @@ class AyarlarScreen extends ConsumerWidget {
             children: [
               SwitchListTile(
                 contentPadding: EdgeInsets.zero,
-                title: Text('Ekranda göster', style: TextStyle(color: colors.textPrimary, fontWeight: FontWeight.w600)),
+                title: Text(
+                  'Ekranda göster',
+                  style: TextStyle(color: colors.textPrimary, fontWeight: FontWeight.w600),
+                ),
                 subtitle: Text('Sağ altta durur; dokununca koç asistanın açılır.', style: TextStyle(fontSize: 12, color: colors.textMuted)),
                 value: ortam.asistanGorunur,
                 onChanged: (v) => ref.read(ortamProvider.notifier).asistanGorunurluk(v),
               ),
               if (ortam.asistanGorunur) ...[
                 const SizedBox(height: 6),
-                LayoutBuilder(builder: (context, kutu) {
-                  const aralik = 8.0;
-                  final genislik = (kutu.maxWidth - aralik * 2) / 3;
-                  return Wrap(
-                    spacing: aralik,
-                    runSpacing: aralik,
-                    children: [
-                      for (final k in AsistanKarakter.values)
-                        Semantics(
-                          button: true,
-                          selected: ortam.asistan == k,
-                          label: '${k.ad} karakterini seç',
-                          excludeSemantics: true,
-                          child: InkWell(
-                            onTap: () => ref.read(ortamProvider.notifier).asistanSec(k),
-                            borderRadius: BorderRadius.circular(16),
-                            child: AnimatedContainer(
-                              duration: const Duration(milliseconds: 200),
-                              width: genislik,
-                              padding: const EdgeInsets.fromLTRB(4, 8, 4, 8),
-                              decoration: BoxDecoration(
-                                color: ortam.asistan == k ? colors.primarySoft : colors.background,
-                                borderRadius: BorderRadius.circular(16),
-                                border: Border.all(
-                                  color: ortam.asistan == k ? colors.primary : colors.border,
-                                  width: ortam.asistan == k ? 2 : 1,
+                LayoutBuilder(
+                  builder: (context, kutu) {
+                    const aralik = 8.0;
+                    final genislik = (kutu.maxWidth - aralik * 2) / 3;
+                    return Wrap(
+                      spacing: aralik,
+                      runSpacing: aralik,
+                      children: [
+                        for (final k in AsistanKarakter.values)
+                          Semantics(
+                            button: true,
+                            selected: ortam.asistan == k,
+                            label: '${k.ad} karakterini seç',
+                            excludeSemantics: true,
+                            child: InkWell(
+                              onTap: () => ref.read(ortamProvider.notifier).asistanSec(k),
+                              borderRadius: BorderRadius.circular(16),
+                              child: AnimatedContainer(
+                                duration: const Duration(milliseconds: 200),
+                                width: genislik,
+                                padding: const EdgeInsets.fromLTRB(4, 8, 4, 8),
+                                decoration: BoxDecoration(
+                                  color: ortam.asistan == k ? colors.primarySoft : colors.background,
+                                  borderRadius: BorderRadius.circular(16),
+                                  border: Border.all(color: ortam.asistan == k ? colors.primary : colors.border, width: ortam.asistan == k ? 2 : 1),
                                 ),
-                              ),
-                              child: Column(
-                                children: [
-                                  Maskot(karakter: k.name, boyut: min(72, genislik - 12), yuruyor: ortam.asistan == k),
-                                  const SizedBox(height: 4),
-                                  Text(k.ad,
-                                      style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: colors.textPrimary)),
-                                ],
+                                child: Column(
+                                  children: [
+                                    Maskot(karakter: k.name, boyut: min(72, genislik - 12), yuruyor: ortam.asistan == k),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      k.ad,
+                                      style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: colors.textPrimary),
+                                    ),
+                                  ],
+                                ),
                               ),
                             ),
                           ),
-                        ),
-                    ],
-                  );
-                }),
+                      ],
+                    );
+                  },
+                ),
                 const SizedBox(height: 14),
-                Text('Hareket', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: colors.textSecondary)),
+                Text(
+                  'Hareket',
+                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: colors.textSecondary),
+                ),
                 const SizedBox(height: 8),
                 SegmentedButton<AsistanHareket>(
                   segments: [
-                    for (final h in AsistanHareket.values) ButtonSegment(value: h, label: Text(h.etiket, style: const TextStyle(fontSize: 12))),
+                    for (final h in AsistanHareket.values)
+                      ButtonSegment(
+                        value: h,
+                        label: Text(h.etiket, style: const TextStyle(fontSize: 12)),
+                      ),
                   ],
                   selected: {ortam.hareket},
                   showSelectedIcon: false,
@@ -136,11 +143,7 @@ class AyarlarScreen extends ConsumerWidget {
                 children: _textScaleOptions.map((option) {
                   final (scale, label) = option;
                   final isSelected = (settings.textScale - scale).abs() < 0.01;
-                  return ChoiceChip(
-                    label: Text(label),
-                    selected: isSelected,
-                    onSelected: (_) => ref.read(settingsProvider.notifier).setTextScale(scale),
-                  );
+                  return ChoiceChip(label: Text(label), selected: isSelected, onSelected: (_) => ref.read(settingsProvider.notifier).setTextScale(scale));
                 }).toList(),
               ),
               const SizedBox(height: 12),
@@ -157,18 +160,17 @@ class AyarlarScreen extends ConsumerWidget {
             children: [
               SwitchListTile(
                 contentPadding: EdgeInsets.zero,
-                title: Text('Hatırlatma Bildirimi', style: TextStyle(color: colors.textPrimary, fontWeight: FontWeight.w600)),
+                title: Text(
+                  'Hatırlatma Bildirimi',
+                  style: TextStyle(color: colors.textPrimary, fontWeight: FontWeight.w600),
+                ),
                 subtitle: Text(
                   'Her gün ${settings.reminderHour.toString().padLeft(2, '0')}:${settings.reminderMinute.toString().padLeft(2, '0')} saatinde çalışma planını hatırlat.',
                   style: TextStyle(fontSize: 12, color: colors.textMuted),
                 ),
                 value: settings.dailyReminderEnabled,
                 onChanged: (val) {
-                  ref.read(settingsProvider.notifier).setDailyReminder(
-                        enabled: val,
-                        hour: settings.reminderHour,
-                        minute: settings.reminderMinute,
-                      );
+                  ref.read(settingsProvider.notifier).setDailyReminder(enabled: val, hour: settings.reminderHour, minute: settings.reminderMinute);
                 },
               ),
               if (settings.dailyReminderEnabled)
@@ -181,11 +183,7 @@ class AyarlarScreen extends ConsumerWidget {
                         initialTime: TimeOfDay(hour: settings.reminderHour, minute: settings.reminderMinute),
                       );
                       if (secilen != null) {
-                        ref.read(settingsProvider.notifier).setDailyReminder(
-                              enabled: true,
-                              hour: secilen.hour,
-                              minute: secilen.minute,
-                            );
+                        ref.read(settingsProvider.notifier).setDailyReminder(enabled: true, hour: secilen.hour, minute: secilen.minute);
                       }
                     },
                     icon: const Icon(Icons.schedule_rounded),
@@ -218,19 +216,26 @@ class _SectionCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: colors.border),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(icon, size: 18, color: colors.textPrimary),
-              const SizedBox(width: 8),
-              Text(title, style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: colors.textPrimary)),
-            ],
-          ),
-          const SizedBox(height: 14),
-          ...children,
-        ],
+      // Liste satırlarının mürekkep efekti renkli kutunun üstünde çizilsin.
+      child: Material(
+        type: MaterialType.transparency,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(icon, size: 18, color: colors.textPrimary),
+                const SizedBox(width: 8),
+                Text(
+                  title,
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: colors.textPrimary),
+                ),
+              ],
+            ),
+            const SizedBox(height: 14),
+            ...children,
+          ],
+        ),
       ),
     );
   }

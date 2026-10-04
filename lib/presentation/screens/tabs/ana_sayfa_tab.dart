@@ -32,6 +32,7 @@ class AnaSayfaTab extends ConsumerWidget {
     final hafta = ref.watch(donemAnaliziProvider(7));
     final ad = kullanici?.name.split(' ').first ?? '';
     final geriSayim = ref.watch(hedefGeriSayimProvider);
+    final sinif = ref.watch(sinifProvider);
     final hedefMetni = profil?.hedefUniversite?.isNotEmpty == true ? profil!.hedefUniversite! : (profil?.hedefBolumEtiketi ?? '');
 
     return Scaffold(
@@ -128,7 +129,10 @@ class AnaSayfaTab extends ConsumerWidget {
                 children: [
                   Expanded(child: _hizli(context, Icons.edit_note_rounded, 'Test çöz', () => context.push('/test-olustur'))),
                   const SizedBox(width: 8),
-                  Expanded(child: _hizli(context, Icons.add_chart_rounded, 'Deneme', () => context.push('/netler'))),
+                  Expanded(
+                    child: _hizli(context, Icons.add_chart_rounded, 'Deneme',
+                        () => context.push(sinif != null ? '/test-olustur?bolum=deneme' : '/netler')),
+                  ),
                   const SizedBox(width: 8),
                   Expanded(child: _hizli(context, Icons.calendar_month_rounded, 'Program', () => context.push('/program'))),
                   const SizedBox(width: 8),
@@ -201,7 +205,7 @@ class _BugunKarti extends ConsumerWidget {
 
     if (c.gece) {
       return YumusakKart(
-        onTap: () => context.push('/plan'),
+        onTap: () => context.push('/program'),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -238,7 +242,7 @@ class _BugunKarti extends ConsumerWidget {
     }
 
     return YumusakKart(
-      onTap: () => context.push('/plan'),
+      onTap: () => context.push('/program'),
       child: Row(
         children: [
           SizedBox(
@@ -500,8 +504,26 @@ class _NetGrafigi extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final a = ref.watch(donemAnaliziProvider(7));
     final serbest = ref.watch(serbestModProvider);
+    final sinif = ref.watch(sinifProvider);
     if (a == null) return const SizedBox.shrink();
     final tyt = a.tyt;
+
+    if (tyt.bos && a.ayt.bos && sinif != null) {
+      return YumusakKart(
+        onTap: () => context.push('/test-olustur?bolum=deneme'),
+        child: Row(
+          children: [
+            Icon(Icons.assignment_rounded, size: 32, color: context.colors.primary),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text('$sinif. sınıf genel denemesini çöz; sonuçların Analiz › Başarı sekmesinde birikir.',
+                  style: TextStyle(color: context.colors.textSecondary, height: 1.35)),
+            ),
+            Icon(Icons.chevron_right_rounded, color: context.colors.textMuted),
+          ],
+        ),
+      );
+    }
 
     if (tyt.bos && a.ayt.bos) {
       return YumusakKart(

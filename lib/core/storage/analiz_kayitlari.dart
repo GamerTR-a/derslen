@@ -29,6 +29,15 @@ class AnalizKayitlari {
   static const programAyar = 'ders_programi_ayar';
   static const haftalikProgram = 'haftalik_program';
 
+  /// Öğrencinin sabitlediği haftalık program şablonu: { 'gunler': [[blok…] × 7] }
+  static const programSablon = 'program_sablon';
+
+  /// Testlerde yanlış yapılan hazır sorular: { soruId: yanlışSayısı }
+  static const testYanlislar = 'test_yanlis_sorular';
+
+  /// Uygulama içi denemeler: { 'items': [ { tarih, baslik, sinif, dogru, yanlis, bos, saniye }, … ] }
+  static const denemeGecmisi = 'deneme_gecmisi';
+
   /// { 'YYYY-MM-DD': [blokId, ...] } — son 21 gün tutulur.
   static const planTamamlanan = 'plan_tamamlanan';
 

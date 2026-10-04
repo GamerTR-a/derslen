@@ -2,6 +2,7 @@
 /// aynı kurallarla kurulur, sadece renk ve yazı tipleri değişir.
 library;
 
+import 'package:flutter/cupertino.dart' show CupertinoPageTransitionsBuilder;
 import 'package:flutter/material.dart';
 import 'app_theme.dart';
 

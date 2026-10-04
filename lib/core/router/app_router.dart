@@ -8,7 +8,6 @@ import '../../presentation/screens/auth/register_screen.dart';
 import '../../presentation/screens/auth/email_verification_screen.dart';
 import '../../presentation/screens/onboarding_flow/onboarding_screen.dart';
 import '../../presentation/screens/shell_screen.dart';
-import '../../presentation/screens/tabs/gunluk_plan_tab.dart';
 import '../../presentation/screens/tabs/konu_takibi_tab.dart';
 import '../../presentation/screens/tabs/flashkart_tab.dart';
 import '../../presentation/screens/tabs/net_takibi_tab.dart';
@@ -251,12 +250,15 @@ final routerProvider = Provider<GoRouter>((ref) {
         ),
       ),
       GoRoute(
+        // Eski "günlük plan" bağlantıları Programım ekranının Günlük sekmesine gider.
         path: '/plan',
-        builder: (context, state) => const _AltSayfa(child: GunlukPlanTab()),
+        builder: (context, state) => const DersProgramiScreen(),
       ),
       GoRoute(
         path: '/program',
-        builder: (context, state) => const DersProgramiScreen(),
+        builder: (context, state) => DersProgramiScreen(
+          baslangicSekmesi: int.tryParse(state.uri.queryParameters['sekme'] ?? '') ?? 0,
+        ),
       ),
       GoRoute(
         path: '/mufredat',
@@ -284,7 +286,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: '/test-olustur',
-        builder: (context, state) => const TestOlusturScreen(),
+        builder: (context, state) => TestOlusturScreen(baslangicBolumu: state.uri.queryParameters['bolum']),
       ),
       GoRoute(
         path: '/test-coz',

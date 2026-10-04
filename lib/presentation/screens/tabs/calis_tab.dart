@@ -84,6 +84,17 @@ class _CalisTabState extends ConsumerState<CalisTab> {
                       _dersSecici(odak),
                       const SizedBox(height: 18),
                       _kontroller(odak),
+                      if (odak.aktif)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 10),
+                          child: Text(
+                            odak.serbest
+                                ? 'Uygulamadan çıksan ya da telefon kilitlense de seansın sürer; geri döndüğünde kaldığı yerden devam eder.'
+                                : 'Uygulamadan çıksan ya da telefon kilitlense de seansın sürer; süre dolunca bildirim gelir.',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(fontSize: 12, color: context.colors.textMuted),
+                          ),
+                        ),
                       const SizedBox(height: 16),
                       _canliPuan(odak),
                       const SizedBox(height: 24),
@@ -175,7 +186,7 @@ class _CalisTabState extends ConsumerState<CalisTab> {
     final c = context.colors;
     final durum = switch (odak.asama) {
       OdakAsama.hazir => odak.serbest ? 'Serbest mod · hazır' : 'Başlamaya hazır',
-      OdakAsama.calisiyor => '${odak.ders} · odaklanıyorsun',
+      OdakAsama.calisiyor => '${odak.baslik ?? odak.ders} · odaklanıyorsun',
       OdakAsama.duraklatildi => 'Duraklatıldı',
       OdakAsama.tamamlandi => 'Seans tamamlandı',
     };
@@ -215,12 +226,18 @@ class _CalisTabState extends ConsumerState<CalisTab> {
                   style: context.baslik(50, color: yaziRenk).copyWith(fontFeatures: const [FontFeature.tabularFigures()]),
                 ),
                 const SizedBox(height: 4),
-                Text(
-                  durum,
-                  style: TextStyle(
-                    color: gece ? const Color(0xFF3A4474) : Colors.white.withValues(alpha: 0.92),
-                    fontSize: 12.5,
-                    fontWeight: FontWeight.w700,
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 26),
+                  child: Text(
+                    durum,
+                    maxLines: 2,
+                    textAlign: TextAlign.center,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: gece ? const Color(0xFF3A4474) : Colors.white.withValues(alpha: 0.92),
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                 ),
               ],
@@ -266,6 +283,14 @@ class _CalisTabState extends ConsumerState<CalisTab> {
   }
 
   Widget _sureSecici(OdakState odak) {
+    // Program bloğundan başlatılan seansın süresi hazır seçeneklerden farklı olabilir.
+    if (odak.blokId != null && !odakSureleri.contains(odak.sureDk)) {
+      return Row(
+        children: [
+          Expanded(child: HapSecim(etiket: 'Program bloğu · ${odak.sureDk} dk', secili: true)),
+        ],
+      );
+    }
     return Row(
       children: [
         for (final dk in odakSureleri) ...[
@@ -287,6 +312,7 @@ class _CalisTabState extends ConsumerState<CalisTab> {
     final dersler = ref.watch(serbestModProvider)
         ? ['Genel', ...ozel]
         : [..._dersler, for (final d in ozel) if (!_dersler.contains(d)) d];
+    if (!dersler.contains(odak.ders)) dersler.insert(0, odak.ders);
     return SizedBox(
       height: 44,
       child: ListView.separated(
@@ -412,7 +438,16 @@ class _CalisTabState extends ConsumerState<CalisTab> {
     return Expanded(
       child: Column(
         children: [
-          Row(mainAxisSize: MainAxisSize.min, children: [ikon, const SizedBox(width: 5), Text(deger, style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: context.colors.textPrimary))]),
+          Row(mainAxisSize: MainAxisSize.min, children: [
+            ikon,
+            const SizedBox(width: 5),
+            Flexible(
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(deger, style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: context.colors.textPrimary)),
+              ),
+            ),
+          ]),
           const SizedBox(height: 2),
           Text(alt, style: TextStyle(fontSize: 12, color: context.colors.textMuted)),
         ],
@@ -687,7 +722,9 @@ class _OrtamSayfasiState extends ConsumerState<_OrtamSayfasi> {
                     borderRadius: BorderRadius.circular(14),
                     border: Border.all(color: ortam.ses == AmbiyansSes.ozel && ortam.ozelSesYolu == o.yol ? c.primary : c.border),
                   ),
-                  child: ListTile(
+                  child: Material(
+                    type: MaterialType.transparency,
+                    child: ListTile(
                     dense: true,
                     leading: Icon(Icons.music_note_rounded, color: c.primary),
                     title: Text(o.ad, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontWeight: FontWeight.w700, color: c.textPrimary)),
@@ -697,6 +734,7 @@ class _OrtamSayfasiState extends ConsumerState<_OrtamSayfasi> {
                       icon: Icon(Icons.delete_outline_rounded, color: c.textMuted),
                       onPressed: () => _ozelSil(o),
                     ),
+                  ),
                   ),
                 ),
               OutlinedButton.icon(

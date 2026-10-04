@@ -12,6 +12,10 @@
 ///    tamamlanan tekrar. Konular haftaya yayıldığı için her gün aynı konu
 ///    tekrarlanmaz.
 ///  * İsteğe bağlı olarak Pazar günü deneme sınavı bloğu eklenir.
+///  * Öğrenci isterse programa girecek konuları tek tek seçer
+///    ([DersProgramiAyar.seciliKonuIdleri]); program yalnızca bu konulardan
+///    kurulur. Blokları elle ekleyip düzenleyerek kurduğu haftayı
+///    “sabitleyebilir”; sabit program her hafta aynen yinelenir.
 library;
 
 import 'dart:math';
@@ -21,6 +25,7 @@ import '../../data/models/konu.dart';
 import '../../data/models/ogrenci_profil.dart';
 import '../../data/models/plan_blok.dart';
 import '../constants/app_constants.dart';
+import '../constants/sinif_mufredati.dart';
 import '../utils/tarih.dart';
 import 'learning_engine.dart' show hedefDersOnceligi, metodBlokSure;
 
@@ -60,11 +65,20 @@ class DersProgramiAyar {
   final List<String> haricDersler;
   final bool pazarDeneme;
 
+  /// Programa girecek konular (boşsa müfredattaki tüm konular kullanılır).
+  final List<String> seciliKonuIdleri;
+
+  /// Açıkken haftalık program yeniden üretilmez; öğrencinin düzenlediği hafta
+  /// sonraki haftalara aynen taşınır.
+  final bool sabitle;
+
   const DersProgramiAyar({
     required this.gunler,
     this.oncelikliDersler = const [],
     this.haricDersler = const [],
     this.pazarDeneme = true,
+    this.seciliKonuIdleri = const [],
+    this.sabitle = false,
   });
 
   /// Profildeki günlük çalışma saatinden makul bir başlangıç ayarı:
@@ -85,12 +99,16 @@ class DersProgramiAyar {
     List<String>? oncelikliDersler,
     List<String>? haricDersler,
     bool? pazarDeneme,
+    List<String>? seciliKonuIdleri,
+    bool? sabitle,
   }) =>
       DersProgramiAyar(
         gunler: gunler ?? this.gunler,
         oncelikliDersler: oncelikliDersler ?? this.oncelikliDersler,
         haricDersler: haricDersler ?? this.haricDersler,
         pazarDeneme: pazarDeneme ?? this.pazarDeneme,
+        seciliKonuIdleri: seciliKonuIdleri ?? this.seciliKonuIdleri,
+        sabitle: sabitle ?? this.sabitle,
       );
 
   DersProgramiAyar gunGuncelle(int index, GunAyari yeni) =>
@@ -104,6 +122,8 @@ class DersProgramiAyar {
         'oncelikli': oncelikliDersler,
         'haric': haricDersler,
         'pazarDeneme': pazarDeneme,
+        'konular': seciliKonuIdleri,
+        'sabit': sabitle,
       };
 
   factory DersProgramiAyar.fromJson(Map<String, dynamic> j, OgrenciProfil profil) {
@@ -114,6 +134,8 @@ class DersProgramiAyar {
       oncelikliDersler: ((j['oncelikli'] as List?) ?? const []).cast<String>(),
       haricDersler: ((j['haric'] as List?) ?? const []).cast<String>(),
       pazarDeneme: j['pazarDeneme'] as bool? ?? true,
+      seciliKonuIdleri: [for (final e in (j['konular'] as List?) ?? const []) if (e is String) e],
+      sabitle: j['sabit'] as bool? ?? false,
     );
   }
 }
@@ -136,6 +158,17 @@ List<Konu> alanKonulari(String hedefBolum, List<Konu> konular) {
   if (hedefBolum == serbestAlan) return [for (final k in konular) if (k.ozel) k];
   final ayt = alanAytDersleri[hedefBolum] ?? const [];
   return [for (final k in konular) if (k.ozel || k.alan == SinavAlani.TYT || ayt.contains(k.ders)) k];
+}
+
+/// Programa girecek konular: öğrencinin sorumlu olduğu konulardan, (seçim
+/// yaptıysa) yalnızca kendi seçtikleri. Seçilenlerin hiçbiri artık müfredatta
+/// yoksa seçim yok sayılır.
+List<Konu> programKonulari(String hedefBolum, List<Konu> konular, DersProgramiAyar ayar) {
+  final hepsi = alanKonulari(hedefBolum, konular);
+  if (ayar.seciliKonuIdleri.isEmpty) return hepsi;
+  final secili = ayar.seciliKonuIdleri.toSet();
+  final sonuc = [for (final k in hepsi) if (secili.contains(k.id)) k];
+  return sonuc.isEmpty ? hepsi : sonuc;
 }
 
 /// Bir hedef alan için programa girebilecek dersler: önce alanın öncelik
@@ -219,7 +252,7 @@ _DersKuyrugu _kuyrukOlustur(String ders, List<Konu> konular, OgrenmeMetod metod,
 
 /// Derslerin haftalık ağırlıkları (öncelik, zayıflık, kalan konu).
 Map<String, double> dersAgirliklari(OgrenciProfil profil, List<Konu> tumKonular, DersProgramiAyar ayar) {
-  final konular = alanKonulari(profil.hedefBolum, tumKonular);
+  final konular = programKonulari(profil.hedefBolum, tumKonular, ayar);
   final dersler = alanDersleri(profil.hedefBolum, konular)
       .where((d) => !ayar.haricDersler.contains(d))
       .toList();
@@ -316,7 +349,9 @@ List<List<PlanBlok>> haftalikProgramOlustur({
   final denemeVar =
       ayar.pazarDeneme && profil.hedefBolum != serbestAlan && pazar.aktif && pazar.sureDk >= 120 && ilkGun <= 6;
   final aytDeneme = haftaNo.isOdd && profil.hedefBolum != 'dil';
-  final denemeSure = denemeVar ? min(pazar.sureDk, aytDeneme ? 180 : 165) : 0;
+  // 9-11. sınıflarda TYT/AYT yerine uygulama içi sınıf denemesi önerilir.
+  final sinif = araSinif(profil.sinifSeviyesi);
+  final denemeSure = !denemeVar ? 0 : min(pazar.sureDk, sinif != null ? 75 : (aytDeneme ? 180 : 165));
 
   final gunBlok = <int>[
     for (var g = 0; g < 7; g++)
@@ -335,7 +370,7 @@ List<List<PlanBlok>> haftalikProgramOlustur({
     pay,
     karistir: metod == OgrenmeMetod.savasan ? Random(haftaNo) : null,
   );
-  final ilgiliKonular = alanKonulari(profil.hedefBolum, konular);
+  final ilgiliKonular = programKonulari(profil.hedefBolum, konular, ayar);
   final kuyruklar = {for (final d in pay.keys) d: _kuyrukOlustur(d, ilgiliKonular, metod, tytOnce)};
   final dersBlokSayaci = <String, int>{};
 
@@ -355,7 +390,7 @@ List<List<PlanBlok>> haftalikProgramOlustur({
     if (g == 6 && denemeVar) {
       bloklar.add(PlanBlok(
         id: '$anahtar-deneme',
-        konu: aytDeneme ? 'AYT Deneme Sınavı' : 'TYT Deneme Sınavı',
+        konu: sinif != null ? '$sinif. Sınıf Genel Denemesi' : (aytDeneme ? 'AYT Deneme Sınavı' : 'TYT Deneme Sınavı'),
         ders: 'Deneme',
         sure: denemeSure,
         tip: PlanBlokTip.soru,
@@ -413,6 +448,74 @@ PlanBlok _mola(String id, int sure, int saat, DateTime now) => PlanBlok(
       updatedAt: now,
     );
 
+/// Öğrencinin elle eklediği program bloğu.
+PlanBlok elleBlok({
+  required String gunAnahtar,
+  required String ders,
+  required String konu,
+  required int sureDk,
+  required int baslangicDk,
+  PlanBlokTip tip = PlanBlokTip.calisma,
+  DateTime? simdi,
+}) {
+  final now = simdi ?? DateTime.now();
+  final mola = tip == PlanBlokTip.mola;
+  return PlanBlok(
+    id: '$gunAnahtar-e${now.microsecondsSinceEpoch}',
+    konu: konu,
+    ders: mola ? '' : ders,
+    sure: sureDk,
+    tip: tip,
+    renk: mola ? '#10B981' : _renkHex(ders),
+    saat: saatMetni(baslangicDk),
+    createdAt: now,
+    updatedAt: now,
+  );
+}
+
+/// Blok saatini gün içi dakikaya çevirir (saat yoksa null).
+int? blokBaslangicDk(PlanBlok b) => _dakika(b.saat);
+
+/// Blokları başlangıç saatine göre sıralar (saatsizler sonda, sıra korunur).
+List<PlanBlok> saateGoreSirali(List<PlanBlok> bloklar) {
+  final l = [...bloklar];
+  final sira = {for (var i = 0; i < l.length; i++) l[i].id: i};
+  l.sort((a, b) {
+    final c = (_dakika(a.saat) ?? 100000).compareTo(_dakika(b.saat) ?? 100000);
+    return c != 0 ? c : sira[a.id]!.compareTo(sira[b.id]!);
+  });
+  return l;
+}
+
+/// Bir günün son bloğunun bittiği an (gün içi dakika); blok yoksa null.
+int? gunSonuDk(List<PlanBlok> bloklar) {
+  int? son;
+  for (final b in bloklar) {
+    final bas = _dakika(b.saat);
+    if (bas == null) continue;
+    if (son == null || bas + b.sure > son) son = bas + b.sure;
+  }
+  return son;
+}
+
+/// Sabitlenmiş (şablon) haftayı yeni haftanın tarihlerine taşır: blok
+/// kimliklerindeki gün ön eki yenilenir, tamamlanma işaretleri sıfırlanır.
+List<List<PlanBlok>> sablondanHafta(List<List<PlanBlok>> sablon, DateTime haftaBaslangic, {DateTime? simdi}) {
+  final now = simdi ?? DateTime.now();
+  return [
+    for (var g = 0; g < 7; g++)
+      [
+        for (final (i, b) in (g < sablon.length ? sablon[g] : const <PlanBlok>[]).indexed)
+          b.copyWith(
+            id: '${gunAnahtari(haftaBaslangic.add(Duration(days: g)))}-s$i-${b.id.length > 11 ? b.id.substring(11) : b.id}',
+            tamamlandi: false,
+            createdAt: now,
+            updatedAt: now,
+          ),
+      ],
+  ];
+}
+
 /// Bugünün programını check-in'e göre uyarlar: yüksek streste başa nefes
 /// egzersizi eklenir; enerji/stres kapasiteyi düşürüyorsa sondaki bloklar
 /// bugünlük çıkarılır. Blok kimlikleri değişmez (tamamlanma takibi için).
@@ -432,7 +535,9 @@ PlanBlok _mola(String id, int sure, int saat, DateTime now) => PlanBlok(
     }
     sonuc.add(b);
   }
-  while (sonuc.isNotEmpty && sonuc.last.isMola) {
+  // Blok çıkarıldıysa sonda kalan molalar da atılır (öğrencinin gün sonuna
+  // kendi eklediği mola korunur).
+  while (cikarilan > 0 && sonuc.isNotEmpty && sonuc.last.isMola) {
     sonuc.removeLast();
   }
 

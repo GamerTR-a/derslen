@@ -9,7 +9,9 @@ import 'package:yks_kocu/core/theme/theme_extensions.dart';
 
 import '../../../core/algorithms/ders_programi.dart' show alanAytDersleri;
 import '../../../core/constants/app_constants.dart';
-import '../../../core/constants/yks_data.dart';
+import '../../../core/constants/sinif_mufredati.dart';
+import '../../../data/models/konu.dart';
+import '../../providers/konu_provider.dart';
 import '../../../core/utils/tarih.dart';
 import '../../providers/mufredat_provider.dart';
 import '../../providers/plan_provider.dart';
@@ -182,12 +184,15 @@ class _MufredatScreenState extends ConsumerState<MufredatScreen> {
     final serbest = ref.watch(serbestModProvider);
     final ayt = alanAytDersleri[profil?.hedefBolum] ?? const <String>[];
 
-    // Hazır (YKS) dersler: TYT'nin tamamı + alanın AYT dersleri.
-    final hazirDersler = <(SinavAlani, String)>[];
-    if (!serbest) {
-      for (final k in tumKonular) {
-        final anahtar = (k.alan, k.ders);
-        if ((k.alan == SinavAlani.TYT || ayt.contains(k.ders)) && !hazirDersler.contains(anahtar)) hazirDersler.add(anahtar);
+    final sinif = ref.watch(sinifProvider);
+    // Hazır dersler: 9-11. sınıflarda o sınıfın Maarif Modeli dersleri;
+    // diğerlerinde TYT'nin tamamı + alanın AYT dersleri.
+    final hazirDersler = <(String, String), List<Konu>>{};
+    for (final k in ref.watch(hazirMufredatProvider)) {
+      if (sinif != null) {
+        hazirDersler.putIfAbsent(('', k.ders), () => []).add(k);
+      } else if (k.alan == SinavAlani.TYT || ayt.contains(k.ders)) {
+        hazirDersler.putIfAbsent((k.alan.name, k.ders), () => []).add(k);
       }
     }
 
@@ -210,7 +215,9 @@ class _MufredatScreenState extends ConsumerState<MufredatScreen> {
                 Text(
                   serbest
                       ? 'Serbest müfredat: derslerini ve konularını kendin belirlersin. Ders programın, analizlerin ve odak seansların bu derslere göre çalışır.'
-                      : 'Hazır YKS derslerine kendi derslerini ekleyebilir, çalışmayacağın ders ve konuları müfredatından çıkarabilirsin.',
+                      : sinif != null
+                          ? '$sinif. sınıf müfredatın Türkiye Yüzyılı Maarif Modeli konularıyla hazır gelir. Kendi derslerini ekleyebilir, çalışmayacağın ders ve konuları çıkarabilirsin. Sınıfını Profil › Profili Düzenle bölümünden değiştirebilirsin.'
+                          : 'Hazır YKS derslerine kendi derslerini ekleyebilir, çalışmayacağın ders ve konuları müfredatından çıkarabilirsin.',
                   style: TextStyle(fontSize: 13, color: c.textMuted, height: 1.4),
                 ),
                 const SizedBox(height: 12),
@@ -253,8 +260,8 @@ class _MufredatScreenState extends ConsumerState<MufredatScreen> {
                 for (final d in m.ozelDersler) _ozelDersKarti(context, m, d),
                 if (hazirDersler.isNotEmpty) ...[
                   const SizedBox(height: 14),
-                  const BolumBasligi('Hazır YKS dersleri'),
-                  for (final (alan, ders) in hazirDersler) _hazirDersKarti(context, m, alan, ders),
+                  BolumBasligi(sinif != null ? '$sinif. sınıf dersleri' : 'Hazır YKS dersleri'),
+                  for (final e in hazirDersler.entries) _hazirDersKarti(context, m, e.key.$1, e.key.$2, e.value),
                 ],
               ],
             ),
@@ -269,7 +276,12 @@ class _MufredatScreenState extends ConsumerState<MufredatScreen> {
           border: Border.all(color: context.colors.border),
         ),
         clipBehavior: Clip.antiAlias,
-        child: Theme(data: Theme.of(context).copyWith(dividerColor: Colors.transparent), child: child),
+        // Liste satırları mürekkep efektini en yakın Material'a çizer; renkli
+        // kutunun içinde kendi saydam Material'ı olmalıdır.
+        child: Material(
+          type: MaterialType.transparency,
+          child: Theme(data: Theme.of(context).copyWith(dividerColor: Colors.transparent), child: child),
+        ),
       );
 
   Widget _ozelDersKarti(BuildContext context, MufredatState m, String ders) {
@@ -316,9 +328,8 @@ class _MufredatScreenState extends ConsumerState<MufredatScreen> {
     );
   }
 
-  Widget _hazirDersKarti(BuildContext context, MufredatState m, SinavAlani alan, String ders) {
+  Widget _hazirDersKarti(BuildContext context, MufredatState m, String alan, String ders, List<Konu> konular) {
     final c = context.colors;
-    final konular = tumKonular.where((k) => k.alan == alan && k.ders == ders).toList();
     final acik = konular.where((k) => !m.gizliIdler.contains(k.id)).length;
     return _kart(
       context,
@@ -328,13 +339,13 @@ class _MufredatScreenState extends ConsumerState<MufredatScreen> {
           height: 36,
           decoration: BoxDecoration(color: acik == 0 ? c.border : dersRengi(ders), borderRadius: BorderRadius.circular(3)),
         ),
-        title: Text('${alan.name} $ders', style: TextStyle(fontWeight: FontWeight.w800, color: acik == 0 ? c.textMuted : c.textPrimary)),
+        title: Text('$alan $ders'.trim(), style: TextStyle(fontWeight: FontWeight.w800, color: acik == 0 ? c.textMuted : c.textPrimary)),
         subtitle: Text(acik == 0 ? 'Müfredatından çıkarıldı' : '$acik/${konular.length} konu müfredatında',
             style: TextStyle(fontSize: 12.5, color: c.textMuted)),
         trailing: Switch(
           value: acik > 0,
           onChanged: (v) async {
-            await _n.hazirDersGizle(alan, ders, !v);
+            await _n.konulariGizle(konular.map((k) => k.id), !v);
             _degisti = true;
           },
         ),
@@ -346,6 +357,7 @@ class _MufredatScreenState extends ConsumerState<MufredatScreen> {
               controlAffinity: ListTileControlAffinity.leading,
               value: !m.gizliIdler.contains(k.id),
               title: Text(k.baslik, style: TextStyle(color: c.textPrimary)),
+              subtitle: konuTemasi(k.id) == null ? null : Text(konuTemasi(k.id)!, style: TextStyle(fontSize: 11.5, color: c.textMuted)),
               onChanged: (v) async {
                 await _n.konuGizle(k.id, v != true);
                 _degisti = true;

@@ -19,6 +19,9 @@ class _ProfilDuzenleDialogState extends ConsumerState<ProfilDuzenleDialog> {
   late String _hedefBolum;
   late int _gunlukSaat;
   late OgrenmeMetod _ogrenmeMetod;
+  String? _sinif;
+
+  static const List<String> _siniflar = ['9. Sınıf', '10. Sınıf', '11. Sınıf', '12. Sınıf', 'Mezun', 'Üniversite', 'Bağımsız'];
 
   final List<Map<String, dynamic>> _bolumler = [
     {'id': 'sayisal', 'baslik': 'Sayısal', 'ikon': Icons.science_outlined},
@@ -35,6 +38,7 @@ class _ProfilDuzenleDialogState extends ConsumerState<ProfilDuzenleDialog> {
     _hedefBolum = profil?.hedefBolum ?? 'sayisal';
     _gunlukSaat = profil?.gunlukSaat ?? 4;
     _ogrenmeMetod = profil?.ogrenmeMetod ?? OgrenmeMetod.dengeli;
+    _sinif = profil?.sinifSeviyesi;
     _hedefUniversiteController.text = profil?.hedefUniversite ?? '';
   }
 
@@ -45,17 +49,19 @@ class _ProfilDuzenleDialogState extends ConsumerState<ProfilDuzenleDialog> {
   }
 
   Future<void> _kaydet() async {
-    final alanDegisti = ref.read(profilProvider).value?.hedefBolum != _hedefBolum;
+    final onceki = ref.read(profilProvider).value;
+    final alanDegisti = onceki?.hedefBolum != _hedefBolum || onceki?.sinifSeviyesi != _sinif;
     final program = ref.read(programProvider.notifier);
     await ref.read(profilProvider.notifier).kaydetProfil(
           hedefBolum: _hedefBolum,
           gunlukSaat: _gunlukSaat,
           ogrenmeMetod: _ogrenmeMetod,
+          sinifSeviyesi: _sinif,
           hedefUniversite: _hedefUniversiteController.text.trim().isNotEmpty
               ? _hedefUniversiteController.text.trim()
               : null,
         );
-    // Alan değişince müfredat da değişir; program yeni derslere göre yenilenir.
+    // Alan ya da sınıf değişince müfredat da değişir; program yeni derslere göre yenilenir.
     if (alanDegisti) await program.yenidenOlustur();
     if (!mounted) return;
 
@@ -132,6 +138,34 @@ class _ProfilDuzenleDialogState extends ConsumerState<ProfilDuzenleDialog> {
                     },
                   );
                 }).toList(),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Sınıfın',
+                style: TextStyle(color: context.colors.textPrimary, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                '9, 10 ve 11. sınıflarda konuların, testlerin ve kartların o sınıfın müfredatına (Maarif Modeli) göre gelir.',
+                style: TextStyle(fontSize: 12, color: context.colors.textMuted),
+              ),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                children: [
+                  for (final s in _siniflar)
+                    ChoiceChip(
+                      label: Text(s),
+                      selected: _sinif == s,
+                      showCheckmark: false,
+                      selectedColor: context.colors.primary,
+                      labelStyle: TextStyle(
+                        color: _sinif == s ? Colors.white : context.colors.textPrimary,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      onSelected: (_) => setState(() => _sinif = s),
+                    ),
+                ],
               ),
               const SizedBox(height: 20),
 

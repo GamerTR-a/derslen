@@ -15,6 +15,7 @@ import 'core/services/notification_service.dart';
 import 'core/services/surum_kontrol.dart';
 import 'core/services/timeout_http_client.dart';
 import 'presentation/providers/auth_provider.dart';
+import 'presentation/providers/odak_provider.dart';
 import 'presentation/providers/profil_provider.dart';
 import 'presentation/providers/settings_provider.dart';
 
@@ -124,6 +125,7 @@ class _YksKocuAppState extends ConsumerState<YksKocuApp> with WidgetsBindingObse
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state != AppLifecycleState.resumed) return;
+    ref.read(odakProvider.notifier).onPlanaDonuldu();
     ref.read(authProvider.notifier).bulutlaEsitle();
     ref.invalidate(surumBilgisiProvider);
   }

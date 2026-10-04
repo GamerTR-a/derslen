@@ -11,6 +11,7 @@ import 'package:timezone/data/latest_all.dart' as tz_data;
 class NotificationService {
   static final FlutterLocalNotificationsPlugin _plugin = FlutterLocalNotificationsPlugin();
   static const int _dailyReminderId = 1001;
+  static const int _odakBitisId = 1002;
   static bool _initialized = false;
 
   static Future<void> init() async {
@@ -76,6 +77,44 @@ class NotificationService {
       await _plugin.cancel(_dailyReminderId);
     } catch (e) {
       if (kDebugMode) debugPrint('NotificationService: iptal edilemedi: $e');
+    }
+  }
+
+  /// Süren odak seansının biteceği an için tek seferlik bildirim kurar;
+  /// uygulama arka plandayken ya da kapalıyken sürenin dolduğunu haber verir.
+  static Future<void> odakBitisiniZamanla(DateTime bitis, String baslik) async {
+    if (!bitis.isAfter(DateTime.now().add(const Duration(seconds: 5)))) return;
+    if (!_initialized) await init();
+    if (!_initialized) return;
+    try {
+      await _plugin.zonedSchedule(
+        _odakBitisId,
+        'Odak seansın tamamlandı',
+        "$baslik · süren doldu. Seansını kaydetmek için DersNet'i aç.",
+        tz.TZDateTime.from(bitis, tz.local),
+        const NotificationDetails(
+          android: AndroidNotificationDetails(
+            'odak_seansi',
+            'Odak Seansı',
+            channelDescription: 'Odak sayacı bittiğinde haber verir',
+            importance: Importance.high,
+            priority: Priority.high,
+          ),
+          iOS: DarwinNotificationDetails(),
+        ),
+        androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+      );
+    } catch (e) {
+      if (kDebugMode) debugPrint('NotificationService: odak bildirimi zamanlanamadı: $e');
+    }
+  }
+
+  static Future<void> odakBildiriminiIptalEt() async {
+    if (!_initialized) return;
+    try {
+      await _plugin.cancel(_odakBitisId);
+    } catch (e) {
+      if (kDebugMode) debugPrint('NotificationService: odak bildirimi iptal edilemedi: $e');
     }
   }
 

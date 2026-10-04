@@ -1,9 +1,20 @@
+/// Konularım — müfredattaki konuların takibi: tamamlandı / zayıf işaretleri,
+/// derse göre süzme ve (9-11. sınıf konularında) tek dokunuşla konu testi.
+library;
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_constants.dart';
+import '../../../core/constants/sinif_mufredati.dart';
+import '../../../core/constants/soru_havuzu.dart';
+import '../../../data/models/konu.dart';
 import '../../providers/konu_provider.dart';
 import '../../providers/mufredat_provider.dart';
+import '../../providers/test_provider.dart';
+import '../../widgets/grafikler.dart';
+import '../../widgets/ui_kit.dart';
 import 'package:yks_kocu/core/theme/theme_extensions.dart';
 
 class KonuTakibiTab extends ConsumerStatefulWidget {
@@ -17,116 +28,110 @@ class _KonuTakibiTabState extends ConsumerState<KonuTakibiTab> {
   String _gorunum = 'TYT';
   String _seciliDersFilter = 'hepsi';
 
+  void _konuTesti(Konu konu) {
+    HapticFeedback.selectionClick();
+    ref.read(aktifTestProvider.notifier).konuTestiOlustur(konu.id);
+    context.push('/test-coz');
+  }
+
   @override
   Widget build(BuildContext context) {
+    final c = context.colors;
     final serbest = ref.watch(serbestModProvider);
+    final sinif = ref.watch(sinifProvider);
     final tumu = ref.watch(konuProvider);
     final ozelVar = tumu.any((k) => k.ozel);
-    final gorunum = serbest ? 'OZEL' : (_gorunum == 'OZEL' && !ozelVar ? 'TYT' : _gorunum);
+
+    // Görünümler: sınıf modunda [Sınıf, Derslerim]; YKS'de [TYT, AYT, Derslerim].
+    final gorunumler = <(String, String)>[
+      if (!serbest && sinif != null) ('SINIF', '$sinif. sınıf'),
+      if (!serbest && sinif == null) ...[('TYT', 'TYT'), ('AYT', 'AYT')],
+      if (serbest || ozelVar) ('OZEL', 'Derslerim'),
+    ];
+    final gorunum = gorunumler.any((g) => g.$1 == _gorunum) ? _gorunum : gorunumler.first.$1;
     final konular = switch (gorunum) {
       'OZEL' => tumu.where((k) => k.ozel).toList(),
       'AYT' => tumu.where((k) => !k.ozel && k.alan == SinavAlani.AYT).toList(),
+      'SINIF' => tumu.where((k) => !k.ozel).toList(),
       _ => tumu.where((k) => !k.ozel && k.alan == SinavAlani.TYT).toList(),
     };
 
     final tamamlananSayisi = konular.where((k) => k.tamamlandi).length;
+    final zayifSayisi = konular.where((k) => k.zayif).length;
     final yuzde = konular.isEmpty ? 0.0 : tamamlananSayisi / konular.length;
 
-    final dersler = ['hepsi', ...konular.map((k) => k.ders).toSet()];
-    if (!dersler.contains(_seciliDersFilter)) _seciliDersFilter = 'hepsi';
-    final filtrelenmis = _seciliDersFilter == 'hepsi'
-        ? konular
-        : konular.where((k) => k.ders == _seciliDersFilter).toList();
+    final dersler = <String>['hepsi'];
+    for (final k in konular) {
+      if (!dersler.contains(k.ders)) dersler.add(k.ders);
+    }
+    final dersFiltre = dersler.contains(_seciliDersFilter) ? _seciliDersFilter : 'hepsi';
+    final filtrelenmis = dersFiltre == 'hepsi' ? konular : konular.where((k) => k.ders == dersFiltre).toList();
+
+    // Liste: ders (ve varsa tema) başlıklarıyla gruplanır.
+    final satirlar = <Widget>[];
+    String? sonBaslik;
+    for (final k in filtrelenmis) {
+      final tema = konuTemasi(k.id);
+      final baslik = [if (dersFiltre == 'hepsi') dersKisaAdi(k.ders), ?tema].join(' · ');
+      if (baslik.isNotEmpty && baslik != sonBaslik) {
+        sonBaslik = baslik;
+        satirlar.add(Padding(
+          padding: const EdgeInsets.fromLTRB(4, 14, 4, 6),
+          child: Text(baslik, style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800, color: c.textMuted)),
+        ));
+      }
+      satirlar.add(_konuSatiri(k));
+    }
 
     return Scaffold(
-      backgroundColor: context.colors.background,
+      backgroundColor: c.background,
       body: SafeArea(
-        child: Column(
-          children: [
-            // Üst Başlık & İlerleme Kartı
-            Padding(
-              padding: const EdgeInsets.all(20.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+        child: konular.isEmpty && gorunumler.length == 1 && gorunum == 'OZEL'
+            ? _bosMufredat()
+            : ListView(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
                 children: [
                   Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text(
-                        'Konu Takibi',
-                        style: TextStyle(
-                            fontSize: 22,
-                            fontWeight: FontWeight.w900,
-                            color: context.colors.textPrimary),
-                      ),
+                      Expanded(child: Text('Konularım', style: context.baslik(24))),
                       IconButton(
-                        icon: Icon(Icons.playlist_add_rounded, color: context.colors.primary),
+                        icon: Icon(Icons.playlist_add_rounded, color: c.primary),
                         tooltip: 'Müfredatı düzenle (ders/konu ekle-çıkar)',
                         onPressed: () => context.push('/mufredat'),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 12),
-
-                  // Soru havuzu (YKS derslerini içerir)
-                  if (!serbest) GestureDetector(
-                    onTap: () => context.push('/test-olustur'),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 14),
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [context.colors.primary, context.colors.success],
-                        ),
-                        borderRadius: BorderRadius.circular(16),
-                        boxShadow: [
-                          BoxShadow(
-                            color: context.colors.primary.withValues(alpha: 0.2),
-                            blurRadius: 10,
-                            offset: const Offset(0, 4),
-                          ),
-                        ],
-                      ),
+                  if (!serbest) ...[
+                    YumusakKart(
+                      onTap: () => context.push('/test-olustur'),
+                      renk: c.primarySoft,
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                       child: Row(
                         children: [
-                          Icon(Icons.science_outlined, size: 26, color: context.colors.onPrimary),
-                          SizedBox(width: 12),
+                          Icon(Icons.quiz_rounded, size: 26, color: c.gece ? c.accent : c.primary),
+                          const SizedBox(width: 12),
                           Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
+                                Text('Test ve deneme', style: TextStyle(color: c.textPrimary, fontWeight: FontWeight.w800, fontSize: 15)),
+                                const SizedBox(height: 2),
                                 Text(
-                                  'Soru Havuzu',
-                                  style: TextStyle(
-                                      color: context.colors.onPrimary,
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 15),
-                                ),
-                                SizedBox(height: 2),
-                                Text(
-                                  'Konu & zorluk seçip özel test oluştur',
-                                  style: TextStyle(
-                                      color: context.colors.onPrimary.withValues(alpha: 0.70), fontSize: 12),
+                                  sinif != null ? 'Konu testi, $sinif. sınıf denemesi ve yanlışlarının tekrarı' : 'Konu testi, deneme ve yanlışlarının tekrarı',
+                                  style: TextStyle(color: c.textSecondary, fontSize: 12.5),
                                 ),
                               ],
                             ),
                           ),
-                          Icon(Icons.arrow_forward_ios,
-                              color: context.colors.onPrimary, size: 16),
+                          Icon(Icons.chevron_right_rounded, color: c.textMuted),
                         ],
                       ),
                     ),
-                  ),
-                  const SizedBox(height: 16),
-
-                  // Görünüm seçici (serbest müfredatta gerekmez)
-                  if (!serbest) ...[
+                    const SizedBox(height: 14),
+                  ],
+                  if (gorunumler.length > 1) ...[
                     SegmentedButton<String>(
-                      segments: [
-                        const ButtonSegment(value: 'TYT', label: Text('TYT')),
-                        const ButtonSegment(value: 'AYT', label: Text('AYT')),
-                        if (ozelVar) const ButtonSegment(value: 'OZEL', label: Text('Derslerim')),
-                      ],
+                      segments: [for (final (deger, etiket) in gorunumler) ButtonSegment(value: deger, label: Text(etiket))],
                       selected: {gorunum},
                       showSelectedIcon: false,
                       onSelectionChanged: (v) => setState(() {
@@ -134,177 +139,145 @@ class _KonuTakibiTabState extends ConsumerState<KonuTakibiTab> {
                         _seciliDersFilter = 'hepsi';
                       }),
                     ),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 14),
                   ],
-
-                  // İlerleme Kartı
                   Container(
                     padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: context.colors.surface,
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: context.colors.border),
-                    ),
+                    decoration: BoxDecoration(color: c.surface, borderRadius: BorderRadius.circular(20), border: Border.all(color: c.border)),
                     child: Column(
                       children: [
                         Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             Expanded(
                               child: Text(
-                                gorunum == 'OZEL' ? 'Tamamlanan konular' : 'Tamamlanan konular ($gorunum)',
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                    color: context.colors.textSecondary, fontSize: 13, fontWeight: FontWeight.w600),
+                                'Tamamlanan konular',
+                                style: TextStyle(color: c.textSecondary, fontSize: 13, fontWeight: FontWeight.w600),
                               ),
                             ),
                             Text(
                               '$tamamlananSayisi / ${konular.length} (%${(yuzde * 100).round()})',
-                              style: TextStyle(
-                                  color: context.colors.primary,
-                                  fontWeight: FontWeight.bold),
+                              style: TextStyle(color: c.gece ? c.accent : c.primary, fontWeight: FontWeight.bold),
                             ),
                           ],
                         ),
                         const SizedBox(height: 10),
                         ClipRRect(
                           borderRadius: BorderRadius.circular(8),
-                          child: LinearProgressIndicator(
-                            value: yuzde,
-                            minHeight: 10,
-                            backgroundColor: context.colors.border,
-                            color: context.colors.primary,
-                          ),
+                          child: LinearProgressIndicator(value: yuzde, minHeight: 10, backgroundColor: c.border, color: c.success),
                         ),
+                        if (zayifSayisi > 0) ...[
+                          const SizedBox(height: 8),
+                          Align(
+                            alignment: Alignment.centerLeft,
+                            child: Text('$zayifSayisi konu zayıf olarak işaretli; programın bu konulara öncelik verir.',
+                                style: TextStyle(fontSize: 12, color: c.textMuted)),
+                          ),
+                        ],
                       ],
                     ),
                   ),
+                  const SizedBox(height: 12),
+                  if (dersler.length > 2)
+                    SizedBox(
+                      height: 44,
+                      child: ListView.separated(
+                        scrollDirection: Axis.horizontal,
+                        itemCount: dersler.length,
+                        separatorBuilder: (_, _) => const SizedBox(width: 8),
+                        itemBuilder: (context, index) {
+                          final ders = dersler[index];
+                          return HapSecim(
+                            etiket: ders == 'hepsi' ? 'Tüm dersler' : dersKisaAdi(ders),
+                            secili: dersFiltre == ders,
+                            onTap: () => setState(() => _seciliDersFilter = ders),
+                          );
+                        },
+                      ),
+                    ),
+                  if (konular.isEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 24),
+                      child: Text('Bu bölümde konu yok. Müfredatını düzenleyerek ders ve konu ekleyebilirsin.',
+                          textAlign: TextAlign.center, style: TextStyle(color: c.textSecondary)),
+                    ),
+                  ...satirlar,
                 ],
               ),
-            ),
+      ),
+    );
+  }
 
-            // Ders Filtre Yatay Listesi
-            SizedBox(
-              height: 40,
-              child: ListView.builder(
-                scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                itemCount: dersler.length,
-                itemBuilder: (context, index) {
-                  final ders = dersler[index];
-                  final isSelected = _seciliDersFilter == ders;
-                  return Padding(
-                    padding: const EdgeInsets.only(right: 8),
-                    child: FilterChip(
-                      label: Text(ders == 'hepsi' ? 'Tüm Dersler' : ders),
-                      selected: isSelected,
-                      selectedColor: context.colors.primary,
-                      labelStyle: TextStyle(
-                        color: isSelected ? Colors.white : context.colors.textPrimary,
-                        fontWeight: FontWeight.bold,
-                      ),
-                      onSelected: (val) {
-                        setState(() => _seciliDersFilter = ders);
-                      },
-                    ),
-                  );
-                },
-              ),
-            ),
+  Widget _bosMufredat() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text('Müfredatında henüz ders yok.', style: TextStyle(color: context.colors.textSecondary, fontSize: 15)),
             const SizedBox(height: 12),
-
-            // Konu Listesi
-            Expanded(
-              child: konular.isEmpty
-                  ? Center(
-                      child: Padding(
-                        padding: const EdgeInsets.all(24),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text('Müfredatında henüz ders yok.', style: TextStyle(color: context.colors.textSecondary, fontSize: 15)),
-                            const SizedBox(height: 12),
-                            FilledButton.icon(
-                              onPressed: () => context.push('/mufredat'),
-                              icon: const Icon(Icons.add_rounded),
-                              label: const Text('Ders ve konu ekle'),
-                            ),
-                          ],
-                        ),
-                      ),
-                    )
-                  : ListView.builder(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-                itemCount: filtrelenmis.length,
-                itemBuilder: (context, index) {
-                  final konu = filtrelenmis[index];
-                  return Container(
-                    margin: const EdgeInsets.only(bottom: 10),
-                    decoration: BoxDecoration(
-                      color: context.colors.surface,
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: context.colors.border),
-                    ),
-                    child: ListTile(
-                      contentPadding:
-                          const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
-                      leading: Checkbox(
-                        value: konu.tamamlandi,
-                        activeColor: context.colors.success,
-                        shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(6)),
-                        onChanged: (_) {
-                          ref
-                              .read(konuProvider.notifier)
-                              .toggleTamamlandi(konu.id);
-                        },
-                      ),
-                      title: Text(
-                        konu.baslik,
-                        style: TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.bold,
-                          color: konu.tamamlandi ? context.colors.textMuted : context.colors.textPrimary,
-                          decoration:
-                              konu.tamamlandi ? TextDecoration.lineThrough : null,
-                        ),
-                      ),
-                      subtitle: Text(
-                        konu.ders,
-                        style: TextStyle(
-                            fontSize: 12, color: context.colors.primary, fontWeight: FontWeight.bold),
-                      ),
-                      trailing: ActionChip(
-                        avatar: Icon(
-                          konu.zayif ? Icons.warning_amber_rounded : Icons.star_border,
-                          size: 16,
-                          color: konu.zayif ? context.colors.danger : context.colors.textMuted,
-                        ),
-                        label: Text(
-                          konu.zayif ? 'Zayıf Konu' : 'Zayıf İşaretle',
-                          style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.bold,
-                            color: konu.zayif ? context.colors.danger : context.colors.textSecondary,
-                          ),
-                        ),
-                        backgroundColor: konu.zayif
-                            ? context.colors.danger.withValues(alpha: 0.12)
-                            : context.colors.background,
-                        onPressed: () {
-                          ref.read(konuProvider.notifier).toggleZayif(konu.id);
-                        },
-                      ),
-                    ),
-                  );
-                },
-              ),
+            FilledButton.icon(
+              onPressed: () => context.push('/mufredat'),
+              icon: const Icon(Icons.add_rounded),
+              label: const Text('Ders ve konu ekle'),
             ),
           ],
         ),
       ),
     );
   }
-}
 
+  Widget _konuSatiri(Konu konu) {
+    final c = context.colors;
+    final sinifKonusu = sinifKonusuBul(konu.id);
+    final testVar = sinifKonusu != null && (konuHazirSorulari(konu.id).isNotEmpty || konuSablonlari(konu.id).isNotEmpty);
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.fromLTRB(4, 4, 6, 4),
+      decoration: BoxDecoration(
+        color: c.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: konu.zayif ? c.danger.withValues(alpha: 0.45) : c.border),
+      ),
+      child: Row(
+        children: [
+          Checkbox(
+            value: konu.tamamlandi,
+            activeColor: c.success,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+            onChanged: (_) => ref.read(konuProvider.notifier).toggleTamamlandi(konu.id),
+          ),
+          Container(width: 4, height: 30, decoration: BoxDecoration(color: konu.renk, borderRadius: BorderRadius.circular(2))),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: Text(
+                konu.baslik,
+                style: TextStyle(
+                  fontSize: 14.5,
+                  fontWeight: FontWeight.w700,
+                  color: konu.tamamlandi ? c.textMuted : c.textPrimary,
+                  decoration: konu.tamamlandi ? TextDecoration.lineThrough : null,
+                ),
+              ),
+            ),
+          ),
+          if (testVar)
+            IconButton(
+              tooltip: 'Bu konudan test çöz',
+              visualDensity: VisualDensity.compact,
+              icon: Icon(Icons.quiz_outlined, color: c.gece ? c.accent : c.primary),
+              onPressed: () => _konuTesti(konu),
+            ),
+          IconButton(
+            tooltip: konu.zayif ? 'Zayıf işaretini kaldır' : 'Zayıf konu olarak işaretle',
+            visualDensity: VisualDensity.compact,
+            icon: Icon(konu.zayif ? Icons.flag_rounded : Icons.outlined_flag_rounded, color: konu.zayif ? c.danger : c.textMuted),
+            onPressed: () => ref.read(konuProvider.notifier).toggleZayif(konu.id),
+          ),
+        ],
+      ),
+    );
+  }
+}

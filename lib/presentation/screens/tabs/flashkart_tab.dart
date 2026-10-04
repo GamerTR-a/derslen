@@ -11,6 +11,7 @@ import '../../cizimler/sahne_boyaci.dart';
 import '../../cizimler/svg_cizimler.dart';
 import '../../../core/algorithms/sm2.dart';
 import '../../../core/constants/app_constants.dart';
+import '../../../core/constants/sinif_mufredati.dart';
 import '../../../data/models/flash_kart.dart';
 import '../../../data/models/kart_durum.dart';
 import 'package:yks_kocu/core/theme/theme_extensions.dart';
@@ -141,6 +142,7 @@ class _FlashkartTabState extends ConsumerState<FlashkartTab> with SingleTickerPr
                     style: TextStyle(fontSize: 13, color: context.colors.textMuted)),
               ),
             ),
+            _sinifSuzgeci(flashkartState.sinif),
             _askiIpi(flashkartState.seciliDers, dueSayilari),
             Expanded(
               child: Padding(
@@ -152,6 +154,34 @@ class _FlashkartTabState extends ConsumerState<FlashkartTab> with SingleTickerPr
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  /// Hazır kartları sınıfa göre süzer (9-11: o sınıfın Maarif konuları).
+  Widget _sinifSuzgeci(int? secili) {
+    void sec(int? s) {
+      HapticFeedback.selectionClick();
+      setState(() {
+        _oturumdaTekrar = 0;
+        _isFlipped = false;
+        _showHint = false;
+      });
+      ref.read(flashkartProvider.notifier).sinifSec(s);
+    }
+
+    return SizedBox(
+      height: 52,
+      child: ListView(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
+        children: [
+          HapSecim(etiket: 'Tüm kartlar', secili: secili == null, onTap: () => sec(null)),
+          for (final s in mufredatliSiniflar) ...[
+            const SizedBox(width: 8),
+            HapSecim(etiket: '$s. sınıf', secili: secili == s, onTap: () => sec(s)),
+          ],
+        ],
       ),
     );
   }

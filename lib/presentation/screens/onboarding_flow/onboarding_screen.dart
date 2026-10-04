@@ -407,7 +407,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
           ),
           const SizedBox(height: 8),
           Text(
-            'Hangi aşamadasın?',
+            'Hangi aşamadasın? 9, 10 ve 11. sınıfı seçersen konuların, testlerin ve kartların o sınıfın müfredatına (Maarif Modeli) göre hazırlanır.',
             style: TextStyle(fontSize: 14, color: context.colors.textSecondary),
           ),
           const SizedBox(height: 14),

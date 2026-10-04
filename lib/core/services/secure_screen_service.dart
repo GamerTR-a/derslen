@@ -20,6 +20,29 @@ class SecureScreenService {
       // Platform desteklemiyorsa veya kanal hazır değilse sessizce yut.
     }
   }
+
+  static bool get _mobil =>
+      defaultTargetPlatform == TargetPlatform.android || defaultTargetPlatform == TargetPlatform.iOS;
+
+  /// Odak seansı sürerken ekranın kendiliğinden kapanmasını (ve telefonun
+  /// kilitlenip uygulamanın arka planda sonlandırılmasını) engeller.
+  static Future<void> ekraniAcikTut(bool acik) async {
+    if (!_mobil) return;
+    try {
+      await _channel.invokeMethod('setKeepScreenOn', {'on': acik});
+    } catch (_) {}
+  }
+
+  /// Android'de uygulamayı kapatmadan arka plana alır (geri tuşu, süren bir
+  /// odak seansını yok etmesin diye). Başarılıysa `true` döner.
+  static Future<bool> arkaPlanaAl() async {
+    if (defaultTargetPlatform != TargetPlatform.android) return false;
+    try {
+      return await _channel.invokeMethod<bool>('moveTaskToBack') ?? false;
+    } catch (_) {
+      return false;
+    }
+  }
 }
 
 /// Bir [State] içine eklendiğinde, ekran açıkken FLAG_SECURE'u etkinleştirir

@@ -10,6 +10,7 @@ library;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/constants/app_constants.dart';
+import '../../core/constants/sinif_mufredati.dart';
 import '../../core/constants/yks_data.dart';
 import '../../core/storage/storage_service.dart';
 import '../../core/utils/tarih.dart';
@@ -151,6 +152,13 @@ class MufredatNotifier extends StateNotifier<MufredatState> {
     await _kaydet(_kopya(gizli: g));
   }
 
+  /// Verilen hazır konuları topluca müfredattan çıkarır / geri ekler.
+  Future<void> konulariGizle(Iterable<String> idler, bool gizle) async {
+    final g = {...state.gizliIdler};
+    gizle ? g.addAll(idler) : g.removeAll(idler);
+    await _kaydet(_kopya(gizli: g));
+  }
+
   /// Hazır bir dersin (ör. AYT Fizik) tüm konularını çıkarır / geri ekler.
   Future<void> hazirDersGizle(SinavAlani alan, String ders, bool gizle) async {
     final idler = tumKonular.where((k) => k.alan == alan && k.ders == ders).map((k) => k.id);
@@ -185,10 +193,26 @@ final serbestModProvider = Provider<bool>((ref) {
   return ref.watch(profilProvider.select((p) => p.value?.hedefBolum)) == serbestMufredat;
 });
 
+/// Hazır Maarif müfredatıyla çalışan lise ara sınıfı (9, 10, 11); 12. sınıf,
+/// mezun ve serbest müfredat için null.
+final sinifProvider = Provider<int?>((ref) {
+  if (ref.watch(serbestModProvider)) return null;
+  return araSinif(ref.watch(profilProvider.select((p) => p.value?.sinifSeviyesi)));
+});
+
 /// Ana sayfadaki geri sayım: (sınav adı, kalan gün). Serbest modda hedef
-/// tarihi girilmediyse null.
+/// tarihi girilmediyse null. Ara sınıflarda öğrencinin gireceği YKS'ye
+/// (12. sınıfın sonundaki) kalan gün gösterilir.
 final hedefGeriSayimProvider = Provider<(String, int)?>((ref) {
-  if (!ref.watch(serbestModProvider)) return ('YKS', yksKalanGun());
+  if (!ref.watch(serbestModProvider)) {
+    final sinif = ref.watch(sinifProvider);
+    if (sinif == null) return ('YKS', yksKalanGun());
+    final simdi = DateTime.now();
+    final ilk = sonrakiYksTarihi(simdi);
+    // Eylül-Haziran arası öğretim yılı: sıradaki YKS, şu anki 12'lerin sınavıdır.
+    final hedef = DateTime(ilk.year + (12 - sinif), ilk.month, ilk.day, ilk.hour);
+    return ('YKS', hedef.difference(sadeceGun(simdi)).inDays);
+  }
   final m = ref.watch(mufredatProvider);
   final gun = m.hedefeKalanGun;
   if (gun == null) return null;

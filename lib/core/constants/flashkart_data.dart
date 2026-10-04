@@ -1,10 +1,12 @@
-/// YKS Flash Kartları — temel desteler + sayısal ve sözel ek desteler.
+/// Hazır flash kartlar — temel desteler, sayısal ve sözel ek desteler, 9-11.
+/// sınıf (Maarif Modeli) konu kartları.
 library;
 
 import '../../data/models/flash_kart.dart';
 import 'flashkart_ek_sayisal.dart';
 import 'flashkart_ek_sozel.dart';
 import 'flashkart_sayisal.dart';
+import 'flashkart_sinif.dart';
 import 'flashkart_sozel.dart';
 
 export '../../data/models/flash_kart.dart' show FlashKart;
@@ -17,6 +19,7 @@ final List<FlashKart> flashKartlar = [
   ...sozelKartlar,
   ...ekSayisalKartlar,
   ...ekSozelKartlar,
+  ...sinifKartlari,
 ];
 
 const List<FlashKart> _temelKartlar = [

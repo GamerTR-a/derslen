@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:yks_kocu/core/theme/theme_extensions.dart';
+import '../../core/services/secure_screen_service.dart';
 import '../providers/bahce_provider.dart';
 import '../providers/flashkart_provider.dart';
 import '../providers/odak_provider.dart';
@@ -41,9 +42,21 @@ class ShellScreen extends ConsumerWidget {
     }
 
     return PopScope(
-      canPop: selectedIndex == 0,
-      onPopInvokedWithResult: (didPop, result) {
-        if (!didPop && selectedIndex != 0) context.go('/ana');
+      // Odak seansı sürerken geri tuşu uygulamayı kapatmaz (sayaç kaybolmasın):
+      // uygulama arka plana alınır, seans devam eder.
+      canPop: selectedIndex == 0 && !odak.aktif,
+      onPopInvokedWithResult: (didPop, result) async {
+        if (didPop) return;
+        if (selectedIndex != 0) {
+          context.go('/ana');
+          return;
+        }
+        final messenger = ScaffoldMessenger.of(context);
+        if (!await SecureScreenService.arkaPlanaAl()) {
+          messenger.showSnackBar(const SnackBar(
+            content: Text('Odak seansın sürüyor. Çıkmadan önce Çalış sekmesinden seansı bitir ya da vazgeç.'),
+          ));
+        }
       },
       child: Scaffold(
         backgroundColor: context.colors.background,

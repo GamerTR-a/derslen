@@ -3,10 +3,23 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/algorithms/sm2.dart';
 import '../../core/constants/flashkart_data.dart';
+import '../../core/constants/sinif_mufredati.dart';
 import '../../core/storage/storage_service.dart';
 import '../../data/models/kart_durum.dart';
 import '../../data/models/soru.dart';
+import 'mufredat_provider.dart';
 import 'profil_provider.dart';
+
+/// Bir sınıfın (9-11) müfredat konularına bağlı hazır kartların kimlikleri.
+Set<String> sinifKartIdleri(int sinif) => _sinifKartIdleri.putIfAbsent(sinif, () {
+      final konular = sinifKonulari(sinif);
+      return {
+        for (final k in flashKartlar)
+          if (konular.any((t) => t.kartEslesir(k.id, k.ders, k.unite))) k.id,
+      };
+    });
+
+final Map<int, Set<String>> _sinifKartIdleri = {};
 
 const String _flashkartStorageKey = 'flashkart_durumlari';
 const String _ozelKartlarStorageKey = 'flashkart_ozel_kartlar';
@@ -41,9 +54,15 @@ class FlashkartState {
   final int bugunYeniSayisi;
   final String yeniSayacTarihi;
 
+  /// Sınıf süzgeci (9, 10, 11): yalnızca o sınıfın konularına ait hazır
+  /// kartlar gösterilir. null ise tüm hazır kartlar. Kullanıcının kendi
+  /// kartları ve testten gelen yanlışlar her zaman görünür.
+  final int? sinif;
+
   const FlashkartState({
     required this.durumlar,
     this.ozelKartlar = const [],
+    this.sinif,
     this.seciliDers = 'hepsi',
     this.bilemedimIdleri = const {},
     this.bugunYeniSayisi = 0,
@@ -54,7 +73,16 @@ class FlashkartState {
   int get kalanYeniKart =>
       yeniSayacTarihi == _bugunAnahtari() ? max(0, gunlukYeniKartSiniri - bugunYeniSayisi) : gunlukYeniKartSiniri;
 
-  List<FlashKart> get tumKartlar => [...flashKartlar, ...ozelKartlar];
+  List<FlashKart> get tumKartlar {
+    final s = sinif;
+    if (s == null) return [...flashKartlar, ...ozelKartlar];
+    final idler = sinifKartIdleri(s);
+    return [
+      for (final k in flashKartlar)
+        if (idler.contains(k.id)) k,
+      ...ozelKartlar,
+    ];
+  }
 
   /// Kart "Yanlışlarım" destesinde mi (testten gelen yanlış ya da bilinemeyen kart)?
   bool yanlislardaMi(FlashKart k) => k.ders == yanlisDeste || bilemedimIdleri.contains(k.id);
@@ -73,10 +101,13 @@ class FlashkartState {
     Set<String>? bilemedimIdleri,
     int? bugunYeniSayisi,
     String? yeniSayacTarihi,
+    int? sinif,
+    bool sinifTemizle = false,
   }) {
     return FlashkartState(
       durumlar: durumlar ?? this.durumlar,
       ozelKartlar: ozelKartlar ?? this.ozelKartlar,
+      sinif: sinifTemizle ? null : (sinif ?? this.sinif),
       seciliDers: seciliDers ?? this.seciliDers,
       bilemedimIdleri: bilemedimIdleri ?? this.bilemedimIdleri,
       bugunYeniSayisi: bugunYeniSayisi ?? this.bugunYeniSayisi,
@@ -88,9 +119,10 @@ class FlashkartState {
 class FlashkartNotifier extends StateNotifier<FlashkartState> {
   final StorageService _storageService;
 
-  FlashkartNotifier(this._storageService)
+  FlashkartNotifier(this._storageService, {int? sinif})
       : super(FlashkartState(
           durumlar: flashKartlar.map((k) => KartDurum.yeniKart(k.id)).toList(),
+          sinif: sinif,
         )) {
     loadStates();
   }
@@ -133,6 +165,12 @@ class FlashkartNotifier extends StateNotifier<FlashkartState> {
 
   void dersSec(String ders) {
     state = state.copyWith(seciliDers: ders);
+  }
+
+  /// Sınıf süzgecini değiştirir (null: tüm kartlar).
+  void sinifSec(int? sinif) {
+    if (sinif == state.sinif) return;
+    state = state.copyWith(sinif: sinif, sinifTemizle: sinif == null);
   }
 
   Future<void> kartOylele(String kartId, Sm2Kalite kalite) async {
@@ -260,7 +298,10 @@ class FlashkartNotifier extends StateNotifier<FlashkartState> {
 final flashkartProvider =
     StateNotifierProvider<FlashkartNotifier, FlashkartState>((ref) {
   final storage = ref.watch(storageServiceProvider);
-  return FlashkartNotifier(storage);
+  final n = FlashkartNotifier(storage, sinif: ref.read(sinifProvider));
+  // Profilde sınıf değişince kartlar da o sınıfa göre süzülür.
+  ref.listen(sinifProvider, (_, sinif) => n.sinifSec(sinif));
+  return n;
 });
 
 /// Bir destede bugün çalışılacak kartlar: tekrar zamanı gelenler, kullanıcı

@@ -15,6 +15,7 @@ import '../../core/algorithms/analiz_motoru.dart';
 import '../../core/algorithms/asistan_motoru.dart';
 import '../../core/algorithms/ders_programi.dart';
 import '../../core/constants/app_constants.dart';
+import '../../core/constants/sinif_mufredati.dart';
 import '../../core/constants/soru_havuzu.dart';
 import '../../core/services/ambiyans_service.dart';
 import '../../core/services/etut_odasi_service.dart';
@@ -441,7 +442,11 @@ class AsistanNotifier extends StateNotifier<AsistanState> {
   Future<String?> komutCalistir(AsistanKomut k) async {
     switch (k.tur) {
       case AsistanKomutTur.testBaslat:
-        final f = _ref.read(testFiltreProvider.notifier)
+        final f = _ref.read(testFiltreProvider.notifier);
+        // Önerilen ders öğrencinin sınıf müfredatında yoksa tüm havuzdan seçilir.
+        final sinif = _ref.read(testFiltreProvider).sinif;
+        if (sinif != null && !sinifDersleri(sinif).contains(k.ders)) f.sinifDegistir(null);
+        f
           ..dersDegistir(k.ders!)
           ..zorlukDegistir('hepsi')
           ..soruSayisiDegistir(k.sayi);
