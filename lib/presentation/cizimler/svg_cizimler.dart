@@ -86,6 +86,50 @@ String _olgun(String id, _Palet p) {
   }
 }
 
+/// İklim bölgelerinin yerli türleri (olgun hâl) — viewBox 0 0 80 100.
+String yerliBitkiSvg(String iklimId, {bool gece = false}) {
+  final p = gece ? _gece : _gunduz;
+  final String govde;
+  switch (iklimId) {
+    case 'akdeniz': // Zeytin
+      govde = '<path d="M40 100c-3-12 4-20-2-32 6 4 9 12 8 20 2-6 6-10 4-18" stroke="#7A6248" stroke-width="6" fill="none" stroke-linecap="round"/>'
+          '<ellipse cx="40" cy="40" rx="28" ry="20" fill="#8FA88A"/><ellipse cx="24" cy="50" rx="15" ry="11" fill="#9DB596"/><ellipse cx="57" cy="48" rx="15" ry="11" fill="#7F9A7C"/>'
+          '<circle cx="30" cy="40" r="2.6" fill="#3F4A36"/><circle cx="46" cy="32" r="2.6" fill="#3F4A36"/><circle cx="52" cy="48" r="2.6" fill="#3F4A36"/><circle cx="38" cy="52" r="2.6" fill="#3F4A36"/>';
+    case 'step': // Gelincik
+      govde = '<path d="M40 100c0-20-3-34 0-52" stroke="${p.sap}" stroke-width="3.5" fill="none" stroke-linecap="round"/>'
+          '<path d="M40 84c-9-1-13-6-14-13 8 1 13 6 14 13z" fill="${p.yaprak}"/><path d="M40 72c8-1 12-6 12-12-8 1-12 6-12 12z" fill="${p.yaprak2}"/>'
+          '<circle cx="29" cy="40" r="12" fill="#E0463F"/><circle cx="51" cy="40" r="12" fill="#E0463F"/><circle cx="40" cy="30" r="12" fill="#EA5A52"/><circle cx="40" cy="48" r="12" fill="#D23B35"/>'
+          '<circle cx="40" cy="40" r="6" fill="#2B2B2B"/><circle cx="40" cy="40" r="2.2" fill="#8BA35A"/>';
+    case 'ekvatoral': // Muz ağacı
+      govde = '<path d="M40 100V46" stroke="#7FA05A" stroke-width="8" stroke-linecap="round"/>'
+          '<path d="M40 50C28 44 12 46 6 60c14 2 26-2 34-10z" fill="${p.yaprak}"/><path d="M40 50c12-6 28-4 34 10-14 2-26-2-34-10z" fill="${p.yaprak2}"/>'
+          '<path d="M40 50C30 36 28 18 36 6c8 12 8 30 4 44z" fill="${p.yaprak}"/><path d="M40 50c2-16 12-28 26-30-2 14-12 26-26 30z" fill="${p.yaprak2}"/><path d="M40 50C36 36 26 26 12 24c2 14 12 24 28 26z" fill="${p.yaprak2}"/>'
+          '<path d="M44 56c6 2 10 8 9 15-5-3-8-8-9-15z" fill="#F6D54A"/><path d="M40 58c3 5 3 11 0 16-3-5-3-11 0-16z" fill="#EFC531"/>';
+    case 'savan': // Akasya
+      govde = '<path d="M40 100V52" stroke="#7A5A3A" stroke-width="5.5" stroke-linecap="round"/><path d="M40 62L22 42M40 58l18-18M40 54V36" stroke="#7A5A3A" stroke-width="3.5" stroke-linecap="round"/>'
+          '<ellipse cx="40" cy="32" rx="36" ry="10" fill="#7C9A4A"/><ellipse cx="26" cy="26" rx="18" ry="7" fill="#8DAA57"/><ellipse cx="54" cy="25" rx="18" ry="7" fill="#6F8C40"/>';
+    case 'col': // Hurma
+      govde = '<path d="M40 100c-2-18 3-34 0-56" stroke="#9A7650" stroke-width="7" fill="none" stroke-linecap="round"/>'
+          '<path d="M36 90h8M36 78h8M37 66h7M37 54h7" stroke="#7A5A3A" stroke-width="1.8" stroke-linecap="round"/>'
+          '<path d="M40 44C30 30 14 28 4 36c12 0 24 4 36 8z" fill="#5E9A5E"/><path d="M40 44c10-14 26-16 36-8-12 0-24 4-36 8z" fill="#4F8A52"/>'
+          '<path d="M40 44C34 28 22 18 10 18c8 8 18 18 30 26z" fill="#6DAA68"/><path d="M40 44c6-16 18-26 30-26-8 8-18 18-30 26z" fill="#5E9A5E"/><path d="M40 44c-2-14 0-28 4-36 4 10 2 24-4 36z" fill="#6DAA68"/>'
+          '<circle cx="36" cy="48" r="3" fill="#B5652E"/><circle cx="43" cy="50" r="3" fill="#C9792F"/><circle cx="40" cy="54" r="3" fill="#B5652E"/>';
+    case 'tayga': // Ladin
+      govde = '<rect x="37" y="86" width="6" height="14" fill="#6E5238"/>'
+          '<path d="M40 4L28 30h7L24 52h8L20 74h9L16 90h48L51 74h9L48 52h8L45 30h7z" fill="#24573F"/>'
+          '<path d="M40 4l-7 15c5-3 9-3 14 0zM30 44c7-4 13-4 20 0l-3-8H33zM26 66c9-4 19-4 28 0l-3-8H29z" fill="#F4F8F9"/>';
+    case 'tundra': // Pamuk otu
+      govde = '<path d="M40 100c0-16-2-30-8-42M40 100c0-18 1-34 6-50M40 100c2-14 8-26 18-34M40 100c-2-12-8-22-16-28" stroke="${p.sap}" stroke-width="2.6" fill="none" stroke-linecap="round"/>'
+          '<path d="M40 100c-6-8-14-10-20-8M40 100c6-8 14-10 20-8" stroke="${p.yaprak}" stroke-width="3" fill="none" stroke-linecap="round"/>'
+          '<circle cx="32" cy="54" r="8" fill="#FFFFFF"/><circle cx="46" cy="46" r="9" fill="#FFFFFF"/><circle cx="58" cy="63" r="7.5" fill="#F4F6F2"/><circle cx="24" cy="70" r="7" fill="#F4F6F2"/>'
+          '<circle cx="32" cy="54" r="8" fill="none" stroke="#D9DED6" stroke-width="1"/><circle cx="46" cy="46" r="9" fill="none" stroke="#D9DED6" stroke-width="1"/>';
+    default: // Kayın
+      govde = '<path d="M40 100V48" stroke="#A9A49A" stroke-width="7" stroke-linecap="round"/><path d="M40 66L28 54M40 60l12-10" stroke="#A9A49A" stroke-width="3.5" stroke-linecap="round"/>'
+          '<circle cx="40" cy="30" r="24" fill="#4E9A5E"/><circle cx="22" cy="42" r="15" fill="#5FAA6C"/><circle cx="58" cy="40" r="15" fill="#5FAA6C"/><circle cx="34" cy="22" r="10" fill="#6FBA7A"/><circle cx="50" cy="48" r="9" fill="#3F8A50"/>';
+  }
+  return '<svg viewBox="0 0 80 100">$govde</svg>';
+}
+
 /// Saksı — viewBox 0 0 80 44.
 String saksiSvg({bool gece = false, bool bos = false}) {
   final govde = gece ? '#5B6488' : (bos ? '#D9C3A5' : '#C8693F');

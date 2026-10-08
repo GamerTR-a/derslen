@@ -147,7 +147,19 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                       ),
                     )
                   else
-                    const SizedBox.shrink(),
+                    // Veli, öğretmen ya da müdür hesabı yanlışlıkla buraya
+                    // düştüyse (ör. yeni cihazda giriş) kod ekranına geçebilsin.
+                    Flexible(
+                      child: TextButton(
+                        onPressed: _kaydediliyor ? null : () => ref.read(authProvider.notifier).kayitTuruAyarla('veli'),
+                        child: Text(
+                          'Öğrenci değilim',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(color: context.colors.textMuted, fontSize: 14, fontWeight: FontWeight.w600),
+                        ),
+                      ),
+                    ),
                   ElevatedButton(
                     onPressed: _kaydediliyor ? null : () {
                       if (_step == 0 && _serbest) {

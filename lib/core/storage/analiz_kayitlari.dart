@@ -25,6 +25,10 @@ class AnalizKayitlari {
   /// { 'items': [ { tarih, ders, dogru, yanlis, bos, saniye }, ... ] }
   static const testGecmisi = 'test_gecmisi';
 
+  /// Konu bazında test sonuçları (okul raporları için):
+  /// { 'YYYY-MM-DD': { 'Ders>Konu': [dogru, yanlis, bos] } } — son 60 gün tutulur.
+  static const testKonu = 'test_konu_log';
+
   /// Haftalık ders programı (bu hafta) ve ayarları.
   static const programAyar = 'ders_programi_ayar';
   static const haftalikProgram = 'haftalik_program';

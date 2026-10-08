@@ -14,6 +14,23 @@ import io.flutter.plugin.common.MethodChannel
 /// plana alır.
 class MainActivity : FlutterActivity() {
     private val channelName = "com.lisenet/secure_screen"
+    private var keepScreenOn = false
+
+    // Bayrak hem pencereye hem kök görünüme yazılır ve her öne gelişte
+    // yeniden uygulanır; biri kaybolsa da ekran açık kalır.
+    private fun applyKeepScreenOn() {
+        if (keepScreenOn) {
+            window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        } else {
+            window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        }
+        window.decorView.keepScreenOn = keepScreenOn
+    }
+
+    override fun onResume() {
+        super.onResume()
+        applyKeepScreenOn()
+    }
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
@@ -29,12 +46,8 @@ class MainActivity : FlutterActivity() {
                     result.success(null)
                 }
                 "setKeepScreenOn" -> {
-                    val on = call.argument<Boolean>("on") ?: false
-                    if (on) {
-                        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-                    } else {
-                        window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-                    }
+                    keepScreenOn = call.argument<Boolean>("on") ?: false
+                    applyKeepScreenOn()
                     result.success(null)
                 }
                 "moveTaskToBack" -> result.success(moveTaskToBack(true))

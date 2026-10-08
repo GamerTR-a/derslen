@@ -5,11 +5,13 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/constants/bahce_data.dart';
+import '../../../core/constants/bahce_iklim.dart';
 import '../../cizimler/cizim_widgetlari.dart';
 import '../../cizimler/sahne_boyaci.dart';
 import '../../providers/bahce_provider.dart';
 import '../../widgets/ui_kit.dart';
 import '../bahce/bahce_magaza_sheet.dart';
+import '../bahce/orman_bolumu.dart';
 import 'package:yks_kocu/core/theme/theme_extensions.dart';
 
 class BahceTab extends ConsumerWidget {
@@ -58,7 +60,7 @@ class BahceTab extends ConsumerWidget {
                 _envanter(context, bahce),
                 const SizedBox(height: 14),
               ],
-              _orman(context, bahce),
+              const OrmanKarti(),
               const SizedBox(height: 20),
               Row(
                 children: [
@@ -140,6 +142,8 @@ class BahceTab extends ConsumerWidget {
     }
 
     final urun = bahceUrunuBul(saksi.bitkiId!);
+    final bolge = iklimBul(bahce.iklim);
+    final sever = bahce.iklimiSever(saksi.bitkiId);
     showModalBottomSheet(
       context: context,
       showDragHandle: true,
@@ -157,6 +161,11 @@ class BahceTab extends ConsumerWidget {
                 '${buyumeEtiketleri[saksi.asama]}${saksi.solgun ? ' · susuz kaldı' : ''}',
                 style: TextStyle(color: saksi.solgun ? c.warning : c.textSecondary, fontWeight: FontWeight.w700),
               ),
+              if (sever && !saksi.olgun) ...[
+                const SizedBox(height: 6),
+                Text('${bolge.ad} iklimini seviyor: sulayınca 2 kat büyür',
+                    textAlign: TextAlign.center, style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: c.success)),
+              ],
               const SizedBox(height: 14),
               _BuyumeCubugu(saksi: saksi),
               const SizedBox(height: 18),
@@ -168,7 +177,7 @@ class BahceTab extends ConsumerWidget {
                         onPressed: () async {
                           Navigator.pop(ctx);
                           await n.hasatEt(index);
-                          if (context.mounted) _mesaj(context, '${urun?.ad ?? 'Bitki'} ormanına taşındı. Saksı yeni tohuma hazır.');
+                          if (context.mounted) _mesaj(context, '${urun?.ad ?? 'Bitki'} ${bolge.ad} ormanına taşındı. Saksı yeni tohuma hazır.');
                         },
                         icon: const Icon(Icons.forest_rounded),
                         label: const Text('Ormanıma taşı'),
@@ -180,7 +189,7 @@ class BahceTab extends ConsumerWidget {
                                 HapticFeedback.lightImpact();
                                 Navigator.pop(ctx);
                                 final hata = await n.sula(index);
-                                if (context.mounted) _mesaj(context, hata ?? 'Sulandı! Bitkin biraz daha büyüdü.');
+                                if (context.mounted) _mesaj(context, hata ?? (sever ? 'Sulandı! Bu iklimi sevdiği için 2 kat büyüdü.' : 'Sulandı! Bitkin biraz daha büyüdü.'));
                               },
                         style: FilledButton.styleFrom(backgroundColor: c.water, foregroundColor: c.onPrimary),
                         icon: const Icon(Icons.water_drop_rounded),
@@ -221,31 +230,6 @@ class BahceTab extends ConsumerWidget {
               ],
             ),
           ),
-        ],
-      ),
-    );
-  }
-
-  Widget _orman(BuildContext context, BahceState bahce) {
-    return YumusakKart(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Expanded(child: Text(context.colors.gece ? 'Işıklı ormanım' : 'Ormanım', style: context.baslik(18))),
-              Text('${bahce.orman.length} bitki', style: TextStyle(color: context.colors.textMuted, fontWeight: FontWeight.w700)),
-            ],
-          ),
-          const SizedBox(height: 8),
-          bahce.orman.isEmpty
-              ? Text('Olgunlaşan bitkilerini buraya taşıyarak kalıcı bir orman kur.',
-                  style: TextStyle(fontSize: 13, color: context.colors.textMuted))
-              : Wrap(
-                  spacing: 2,
-                  runSpacing: 2,
-                  children: [for (final id in bahce.orman) Salinan(aci: 0.03, child: UrunCizimi(urunId: id, boyut: 40))],
-                ),
         ],
       ),
     );
@@ -295,6 +279,7 @@ class BahceTab extends ConsumerWidget {
           satir(Icon(Icons.timer_outlined, size: 18, color: c.primary), 'Her 25 dakikalık odak, ekili tüm bitkilere büyüme verir.'),
           satir(const DamlaIkon(boyut: 17), 'Günde bir kez sulamak da büyütür. Damlaları check-in ve kart tekrarıyla kazanırsın.'),
           satir(const YildizIkon(boyut: 17), 'Odaklandıkça kazandığın yıldızlarla mağazadan yeni tohum ve dekor al.'),
+          satir(Icon(Icons.public_rounded, size: 18, color: c.success), 'Ormanın için bir iklim bölgesi seç. O iklimi seven bitkiler sulayınca 2 kat büyür; olgunlaşanlar o bölgenin ormanına taşınır.'),
           satir(Icon(Icons.spa_outlined, size: 18, color: c.warning), '$solmaGunu gün sulanmayan bitki solar ama ölmez; sulayınca canlanır.'),
         ],
       ),

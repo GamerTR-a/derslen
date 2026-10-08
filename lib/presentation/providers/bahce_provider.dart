@@ -9,6 +9,7 @@ import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/constants/bahce_data.dart';
+import '../../core/constants/bahce_iklim.dart';
 import '../../core/services/supabase_data_service.dart';
 import '../../core/storage/storage_service.dart';
 import 'profil_provider.dart';
@@ -82,7 +83,11 @@ class BahceState {
   final int damla;
   final Map<String, int> envanter;
   final List<String> dekorlar;
-  final List<String> orman;
+  /// Seçili iklim bölgesi: olgun bitkiler bu bölgenin ormanına taşınır.
+  final String iklim;
+
+  /// Bölge kimliği → o bölgenin ormanındaki bitkiler.
+  final Map<String, List<String>> ormanlar;
   final bool hediyeKutusuAcildi;
   final int calismaBirikimDk;
   final String? checkinDamlaTarihi;
@@ -97,7 +102,8 @@ class BahceState {
     this.damla = 5,
     this.envanter = const {},
     this.dekorlar = const [],
-    this.orman = const [],
+    this.iklim = varsayilanIklim,
+    this.ormanlar = const {},
     this.hediyeKutusuAcildi = false,
     this.calismaBirikimDk = 0,
     this.checkinDamlaTarihi,
@@ -111,12 +117,19 @@ class BahceState {
   int get susuzBitki => saksilar.where((s) => !s.bos && !s.bugunSulandi).length;
   bool get solgunVar => saksilar.any((s) => s.solgun);
 
+  /// Tüm bölgelerdeki bitkiler.
+  List<String> get orman => [for (final l in ormanlar.values) ...l];
+  List<String> bolgeOrmani(String id) => ormanlar[id] ?? const [];
+  List<String> get aktifOrman => bolgeOrmani(iklim);
+  bool iklimiSever(String? bitkiId) => bitkiId != null && iklimBul(iklim).sevenler.contains(bitkiId);
+
   BahceState copyWith({
     List<Saksi>? saksilar,
     int? damla,
     Map<String, int>? envanter,
     List<String>? dekorlar,
-    List<String>? orman,
+    String? iklim,
+    Map<String, List<String>>? ormanlar,
     bool? hediyeKutusuAcildi,
     int? calismaBirikimDk,
     String? checkinDamlaTarihi,
@@ -130,7 +143,8 @@ class BahceState {
       damla: damla ?? this.damla,
       envanter: envanter ?? this.envanter,
       dekorlar: dekorlar ?? this.dekorlar,
-      orman: orman ?? this.orman,
+      iklim: iklim ?? this.iklim,
+      ormanlar: ormanlar ?? this.ormanlar,
       hediyeKutusuAcildi: hediyeKutusuAcildi ?? this.hediyeKutusuAcildi,
       calismaBirikimDk: calismaBirikimDk ?? this.calismaBirikimDk,
       checkinDamlaTarihi: checkinDamlaTarihi ?? this.checkinDamlaTarihi,
@@ -146,6 +160,9 @@ class BahceState {
         'damla': damla,
         'envanter': envanter,
         'dekorlar': dekorlar,
+        'iklim': iklim,
+        'ormanlar': ormanlar,
+        // Bölgeleri tanımayan eski sürümler için düz liste.
         'orman': orman,
         'hediyeKutusuAcildi': hediyeKutusuAcildi,
         'calismaBirikimDk': calismaBirikimDk,
@@ -159,12 +176,16 @@ class BahceState {
             ?.map((e) => Saksi.fromJson(Map<String, dynamic>.from(e as Map)))
             .toList() ??
         const [Saksi(), Saksi(), Saksi()];
+    final eski = (j['orman'] as List?)?.cast<String>() ?? const <String>[];
+    final ormanlar = (j['ormanlar'] as Map?)?.map((k, v) => MapEntry(k as String, (v as List).cast<String>())) ??
+        {if (eski.isNotEmpty) varsayilanIklim: eski};
     return BahceState(
       saksilar: saksilar,
       damla: (j['damla'] as num?)?.toInt() ?? 5,
       envanter: (j['envanter'] as Map?)?.map((k, v) => MapEntry(k as String, (v as num).toInt())) ?? const {},
       dekorlar: (j['dekorlar'] as List?)?.cast<String>() ?? const [],
-      orman: (j['orman'] as List?)?.cast<String>() ?? const [],
+      iklim: iklimBul(j['iklim'] as String?).id,
+      ormanlar: ormanlar,
       hediyeKutusuAcildi: j['hediyeKutusuAcildi'] as bool? ?? false,
       calismaBirikimDk: (j['calismaBirikimDk'] as num?)?.toInt() ?? 0,
       checkinDamlaTarihi: j['checkinDamlaTarihi'] as String?,
@@ -240,7 +261,7 @@ class BahceNotifier extends StateNotifier<BahceState> {
     if (state.damla <= 0) return 'Su damlan kalmadı. Kart tekrarı ve check-in ile damla kazan.';
     final saksilar = [...state.saksilar];
     saksilar[index] = saksi.copyWith(
-      buyume: saksi.olgun ? saksi.buyume : saksi.buyume + 1,
+      buyume: saksi.olgun ? saksi.buyume : saksi.buyume + 1 + (state.iklimiSever(saksi.bitkiId) ? iklimSulamaBonusu : 0),
       sonSulama: _gunAnahtari(DateTime.now()),
     );
     state = state.copyWith(saksilar: saksilar, damla: state.damla - 1);
@@ -266,13 +287,24 @@ class BahceNotifier extends StateNotifier<BahceState> {
     return null;
   }
 
-  /// Olgun bitkiyi ormana taşır, saksıyı boşaltır.
+  /// Olgun bitkiyi seçili bölgenin ormanına taşır, saksıyı boşaltır.
   Future<void> hasatEt(int index) async {
     final saksi = state.saksilar[index];
     if (!saksi.olgun || saksi.bitkiId == null) return;
     final saksilar = [...state.saksilar];
     saksilar[index] = const Saksi();
-    state = state.copyWith(saksilar: saksilar, orman: [...state.orman, saksi.bitkiId!]);
+    state = state.copyWith(
+      saksilar: saksilar,
+      ormanlar: {...state.ormanlar, state.iklim: [...state.aktifOrman, saksi.bitkiId!]},
+    );
+    await _kaydet();
+  }
+
+  Future<void> iklimSec(String id) async {
+    await _yuklendi;
+    final bolge = iklimBul(id).id;
+    if (bolge != id || state.iklim == id) return;
+    state = state.copyWith(iklim: id);
     await _kaydet();
   }
 

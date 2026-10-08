@@ -26,12 +26,24 @@ class SecureScreenService {
 
   /// Odak seansı sürerken ekranın kendiliğinden kapanmasını (ve telefonun
   /// kilitlenip uygulamanın arka planda sonlandırılmasını) engeller.
-  static Future<void> ekraniAcikTut(bool acik) async {
+  ///
+  /// Birden çok sayaç aynı anda isteyebilir (odak seansı sürerken test
+  /// çözmek gibi): ekran, isteyen son [sahip] bırakana kadar açık kalır.
+  static Future<void> ekraniAcikTut(bool acik, {String sahip = 'odak'}) async {
+    if (acik) {
+      _acikTutanlar.add(sahip);
+    } else {
+      _acikTutanlar.remove(sahip);
+    }
     if (!_mobil) return;
     try {
-      await _channel.invokeMethod('setKeepScreenOn', {'on': acik});
-    } catch (_) {}
+      await _channel.invokeMethod('setKeepScreenOn', {'on': _acikTutanlar.isNotEmpty});
+    } catch (e) {
+      debugPrint('Ekranı açık tutma ayarlanamadı: $e');
+    }
   }
+
+  static final Set<String> _acikTutanlar = {};
 
   /// Android'de uygulamayı kapatmadan arka plana alır (geri tuşu, süren bir
   /// odak seansını yok etmesin diye). Başarılıysa `true` döner.

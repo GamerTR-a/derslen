@@ -4,10 +4,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/theme/theme_extensions.dart';
 import '../../../core/services/secure_screen_service.dart';
+import '../../../data/models/okul_modelleri.dart';
 import '../../providers/auth_provider.dart';
 
 class RegisterScreen extends ConsumerStatefulWidget {
-  const RegisterScreen({super.key});
+  /// Karşılama ekranında seçilen tür: 'ogrenci' | 'veli' | 'ogretmen' | 'mudur'.
+  final String? tur;
+
+  const RegisterScreen({super.key, this.tur});
 
   @override
   ConsumerState<RegisterScreen> createState() => _RegisterScreenState();
@@ -22,6 +26,15 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> with SecureScre
   late final TapGestureRecognizer _politikaTik = TapGestureRecognizer()
     ..onTap = () => context.push('/gizlilik-politikasi');
 
+  KullaniciRolu get _rol => KullaniciRolu.turden(widget.tur) ?? KullaniciRolu.ogrenci;
+
+  String get _altBaslik => switch (_rol) {
+        KullaniciRolu.ogrenci => 'E-posta ve şifreni yaz, hemen başla',
+        KullaniciRolu.veli => 'Hesabını aç; ardından çocuğunun verdiği veli kodunu gireceksin',
+        KullaniciRolu.ogretmen => 'Hesabını aç; ardından müdürünün verdiği öğretmen kodunu gireceksin',
+        KullaniciRolu.mudur => 'Hesabını aç; ardından DersNet ekibinin verdiği okul kodunu gireceksin',
+      };
+
   @override
   void dispose() {
     _emailController.dispose();
@@ -34,6 +47,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> with SecureScre
     if (_formKey.currentState!.validate()) {
       FocusScope.of(context).unfocus();
       setState(() => _isLoading = true);
+      // Bağlantıyla doğrudan gelinmişse de seçilen tür hatırlansın.
+      await ref.read(authProvider.notifier).kayitTuruAyarla(_rol == KullaniciRolu.ogrenci ? null : _rol.tur);
       final success = await ref.read(authProvider.notifier).register(
             email: _emailController.text.trim(),
             password: _passwordController.text.trim(),
@@ -44,7 +59,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> with SecureScre
         // Yönlendirme oturum durumuna göre: doğrudan profil kurulumu ya da
         // (sunucu hâlâ e-posta onayı istiyorsa) kod ekranı.
         final bekliyor = ref.read(authProvider).status == AuthStatus.emailVerificationPending;
-        context.go(bekliyor ? '/verify-email' : '/onboarding');
+        context.go(bekliyor ? '/verify-email' : (_rol == KullaniciRolu.ogrenci ? '/onboarding' : '/rol-kodu'));
       } else if (mounted) {
         final error = ref.read(authProvider).errorMessage;
         ScaffoldMessenger.of(context).showSnackBar(
@@ -74,7 +89,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> with SecureScre
                 children: [
                   Center(
                     child: Text(
-                      'Kayıt Ol',
+                      _rol == KullaniciRolu.ogrenci ? 'Kayıt Ol' : '${_rol.etiket} Kaydı',
                       style: TextStyle(
                         fontSize: 32,
                         fontWeight: FontWeight.w900,
@@ -85,7 +100,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> with SecureScre
                   const SizedBox(height: 8),
                   Center(
                     child: Text(
-                      'E-posta ve şifreni yaz, hemen başla',
+                      _altBaslik,
                       style: TextStyle(fontSize: 13, color: colors.textMuted),
                       textAlign: TextAlign.center,
                     ),

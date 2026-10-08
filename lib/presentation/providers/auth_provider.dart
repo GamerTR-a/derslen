@@ -4,6 +4,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' as sb;
 import '../../core/services/auth_service.dart';
+import '../../core/services/okul_service.dart';
+import '../../data/models/okul_modelleri.dart';
 import '../../core/storage/storage_service.dart';
 import '../../core/storage/synced_storage_service.dart';
 import 'profil_provider.dart';
@@ -24,13 +26,20 @@ class AuthState {
   final String? errorMessage;
   final String? userId;
 
+  /// Sunucudaki rol (`profiles.role`): 'student' | 'teacher' | 'parent' |
+  /// 'principal' | 'baskan' | 'admin'. Hangi panelin açılacağını belirler.
+  final String rol;
+
   const AuthState({
     required this.status,
     this.email,
     this.adSoyad,
     this.errorMessage,
     this.userId,
+    this.rol = 'student',
   });
+
+  KullaniciRolu get panel => KullaniciRolu.coz(rol);
 
   AuthState copyWith({
     AuthStatus? status,
@@ -38,6 +47,7 @@ class AuthState {
     String? adSoyad,
     String? errorMessage,
     String? userId,
+    String? rol,
   }) {
     return AuthState(
       status: status ?? this.status,
@@ -45,6 +55,7 @@ class AuthState {
       adSoyad: adSoyad ?? this.adSoyad,
       errorMessage: errorMessage ?? this.errorMessage,
       userId: userId ?? this.userId,
+      rol: rol ?? this.rol,
     );
   }
 }
@@ -57,6 +68,15 @@ class AuthNotifier extends StateNotifier<AuthState> {
   /// Eşitleme yerel kopyayı değiştirdiğinde çağrılır (bellekteki durum yenilensin).
   final void Function()? onBulutDegisti;
   DateTime? _sonEsitleme;
+
+  /// Karşılama ekranında seçilen kayıt türü ('veli' | 'ogretmen' | 'mudur').
+  /// Hesap açıldıktan sonra öğrenci profil kurulumu yerine kod ekranı açılır.
+  /// Yetki vermez; rol yalnızca sunucuda geçerli bir kodla değişir.
+  String? _kayitTuru;
+  String? get kayitTuru => _kayitTuru;
+
+  static const _kayitTuruAnahtari = 'kayit_turu';
+  static String _rolAnahtari(String userId) => 'rol_$userId';
 
   AuthNotifier(this._authService, this._storageService, {this.onBulutDegisti})
       : super(AuthState(status: _kayitliOturumVar() ? AuthStatus.yukleniyor : AuthStatus.unauthenticated)) {
@@ -102,6 +122,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
   /// Kaynak: Supabase yapılandırılmışsa gerçek session (`auth.currentSession`);
   /// Supabase hiç yapılandırılmamışsa (dev/offline build) eski local-flag akışı.
   Future<void> loadSession() async {
+    _kayitTuru = await _storageService.getString(_kayitTuruAnahtari);
     final supabase = _supabase;
 
     if (supabase != null) {
@@ -142,13 +163,16 @@ class AuthNotifier extends StateNotifier<AuthState> {
     final email = session.user.email;
 
     final synced = SyncedStorageService(local: _storageService, userId: userId);
+    final onbellekRol = await _storageService.getString(_rolAnahtari(userId));
+    final onbellekPanel = onbellekRol != null && KullaniciRolu.coz(onbellekRol) != KullaniciRolu.ogrenci;
     var isProfilDone = false;
     try {
       // Profil bu cihazda zaten varsa ağ beklenmez; bulut eşitlemesi arka
-      // planda sürer (yalnızca yerelde eksik anahtarları doldurur).
+      // planda sürer (yalnızca yerelde eksik anahtarları doldurur). Öğretmen,
+      // veli ve müdür hesaplarında öğrenci profili aranmaz.
       final yereldeVar = await _storageService.getMap('sd_${userId}_ogrenci_profil_data') != null;
-      if (yereldeVar) {
-        isProfilDone = true;
+      if (yereldeVar || onbellekPanel) {
+        isProfilDone = yereldeVar;
         unawaited(_esitle(synced).then((_) => synced.migrateLegacyLocalData()).catchError((_) {}));
       } else {
         await synced.bulutlaEsitle();
@@ -160,6 +184,16 @@ class AuthNotifier extends StateNotifier<AuthState> {
       if (kDebugMode) debugPrint('AuthNotifier: oturum çözülemedi: $e');
     }
 
+    // Rol: önbellekte varsa ya da öğrenci profili bu cihazdaysa ağ beklenmez,
+    // arka planda tazelenir.
+    final String rol;
+    if (onbellekRol != null || isProfilDone) {
+      rol = onbellekRol ?? 'student';
+      unawaited(_rolTazele(userId));
+    } else {
+      rol = await _rolSunucudan(userId) ?? 'student';
+    }
+
     // Beklerken oturum kapandıysa (token yenilenemedi, çıkış yapıldı) eski
     // sonucu yazma.
     if (!mounted) return;
@@ -168,11 +202,73 @@ class AuthNotifier extends StateNotifier<AuthState> {
       return;
     }
 
+    final okulPaneli = KullaniciRolu.coz(rol) != KullaniciRolu.ogrenci;
+    if (okulPaneli) await _kayitTurunuYaz(null);
     state = AuthState(
-      status: isProfilDone ? AuthStatus.authenticated : AuthStatus.onboardingPending,
+      status: isProfilDone || okulPaneli ? AuthStatus.authenticated : AuthStatus.onboardingPending,
       email: email,
       userId: userId,
+      rol: rol,
     );
+  }
+
+  Future<String?> _rolSunucudan(String userId) async {
+    try {
+      final rol = await OkulService.rol().timeout(const Duration(seconds: 8));
+      await _storageService.setString(_rolAnahtari(userId), rol);
+      return rol;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Rol sunucuda değiştiyse (ör. müdür öğretmeni okuldan çıkardı) paneli günceller.
+  Future<void> _rolTazele(String userId) async {
+    final rol = await _rolSunucudan(userId);
+    if (rol == null || !mounted || state.userId != userId || state.rol == rol) return;
+    await _roluUygula(userId, rol);
+  }
+
+  Future<void> _roluUygula(String userId, String rol) async {
+    final okulPaneli = KullaniciRolu.coz(rol) != KullaniciRolu.ogrenci;
+    var profilVar = true;
+    if (!okulPaneli) {
+      profilVar = await SyncedStorageService(local: _storageService, userId: userId).getMap('ogrenci_profil_data') != null;
+    }
+    if (!mounted || state.userId != userId) return;
+    if (okulPaneli) await _kayitTurunuYaz(null);
+    state = state.copyWith(
+      rol: rol,
+      status: okulPaneli || profilVar ? AuthStatus.authenticated : AuthStatus.onboardingPending,
+    );
+  }
+
+  /// Bir okul ya da veli kodu kabul edildikten sonra çağrılır: rolü sunucudan
+  /// okur ve kullanıcıyı kendi paneline geçirir. Rol okunamazsa false döner.
+  Future<bool> rolTamamlandi() async {
+    final userId = state.userId;
+    if (userId == null) return false;
+    final rol = await _rolSunucudan(userId);
+    if (rol == null) return false;
+    await _roluUygula(userId, rol);
+    return true;
+  }
+
+  Future<void> _kayitTurunuYaz(String? tur) async {
+    _kayitTuru = tur;
+    if (tur == null) {
+      await _storageService.remove(_kayitTuruAnahtari);
+    } else {
+      await _storageService.setString(_kayitTuruAnahtari, tur);
+    }
+  }
+
+  /// Karşılama ekranındaki seçim. null: öğrenci (varsayılan akış).
+  Future<void> kayitTuruAyarla(String? tur) async {
+    final gecerli = tur == 'veli' || tur == 'ogretmen' || tur == 'mudur' ? tur : null;
+    await _kayitTurunuYaz(gecerli);
+    // Yönlendirici oturum durumunu dinler; seçim değişince yeniden değerlendirsin.
+    if (mounted) state = state.copyWith();
   }
 
   Future<void> _esitle(SyncedStorageService synced) async {
@@ -310,7 +406,9 @@ class AuthNotifier extends StateNotifier<AuthState> {
     // (tema vb.) etkilenmez.
     if (userId != null) {
       await SyncedStorageService(local: _storageService, userId: userId).clearUserData();
+      await _storageService.remove(_rolAnahtari(userId));
     }
+    await _kayitTurunuYaz(null);
     await SecureStorageService.deleteAll();
     await _ozelArkaPlaniSil();
 

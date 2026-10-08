@@ -5,6 +5,7 @@ import 'tabs/admin_users_tab.dart';
 import 'tabs/admin_tickets_tab.dart';
 import 'tabs/admin_communities_tab.dart';
 import 'tabs/admin_role_elevation_tab.dart';
+import 'tabs/admin_okullar_tab.dart';
 import 'package:yks_kocu/core/theme/theme_extensions.dart';
 
 class AdminScreen extends StatefulWidget {
@@ -22,7 +23,7 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 5, vsync: this);
+    _tabController = TabController(length: 6, vsync: this);
     _checkAdminRouteGuard();
   }
 
@@ -100,6 +101,7 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
             Tab(icon: Icon(Icons.support_agent), text: 'Talepler'),
             Tab(icon: Icon(Icons.groups), text: 'Topluluklar'),
             Tab(icon: Icon(Icons.verified_user), text: 'Yetki Yükseltme'),
+            Tab(icon: Icon(Icons.account_balance), text: 'Okullar'),
           ],
         ),
       ),
@@ -111,6 +113,7 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
           const AdminTicketsTab(),
           const AdminCommunitiesTab(),
           AdminRoleElevationTab(onGoToUsers: () => _tabController.animateTo(1)),
+          const AdminOkullarTab(),
         ],
       ),
     );

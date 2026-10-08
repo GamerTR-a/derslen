@@ -104,59 +104,75 @@ class _FlashkartTabState extends ConsumerState<FlashkartTab> with SingleTickerPr
 
     return Scaffold(
       backgroundColor: context.colors.background,
-      floatingActionButton: FloatingActionButton.extended(
-        heroTag: 'kart_ekle',
-        onPressed: () => _kartEkleSayfasi(context),
-        icon: const Icon(Icons.add_rounded),
-        label: const Text('Kart ekle', style: TextStyle(fontWeight: FontWeight.w800)),
-      ),
-      floatingActionButtonLocation: FloatingActionButtonLocation.startFloat,
       body: SafeArea(
-        child: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Text('Kartlar', style: context.baslik(28)),
+        child: LayoutBuilder(
+          builder: (context, kisit) {
+            final dar = kisit.maxHeight < _rahatYukseklik;
+            return CustomScrollView(
+              slivers: [
+                SliverToBoxAdapter(
+                  child: Column(
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Text('Kartlar', style: context.baslik(28)),
+                            ),
+                            IconButton(
+                              tooltip: 'Destedeki tüm kartlar',
+                              onPressed: () => _desteListesi(context, flashkartState.seciliDers),
+                              icon: Icon(Icons.format_list_bulleted_rounded, color: context.colors.textSecondary),
+                            ),
+                            SayacRozeti(ikon: const _KartBitkisi(2, true, boyut: 17), deger: '${dueSayilari['hepsi'] ?? 0}', renk: context.colors.warning, semantik: '${dueSayilari['hepsi'] ?? 0} kart tekrar bekliyor'),
+                            const SizedBox(width: 8),
+                            SayacRozeti(ikon: const DamlaIkon(boyut: 15), deger: '$damla', renk: context.colors.water, semantik: '$damla su damlası'),
+                          ],
+                        ),
+                      ),
+                      if (!dar)
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(20, 4, 20, 0),
+                          child: Align(
+                            alignment: Alignment.centerLeft,
+                            child: Text(context.colors.gece
+                                ? 'Işıklı ipteki desteyi seç; tekrar ettikçe kartların çiçek açar.'
+                                : 'İpteki desteyi seç. Tekrar ettikçe kartların çiçek açar, bahçen için su kazanırsın.',
+                                style: TextStyle(fontSize: 13, color: context.colors.textMuted)),
+                          ),
+                        ),
+                      _sinifSuzgeci(flashkartState.sinif),
+                      _askiIpi(flashkartState.seciliDers, dueSayilari),
+                    ],
                   ),
-                  IconButton(
-                    tooltip: 'Destedeki tüm kartlar',
-                    onPressed: () => _desteListesi(context, flashkartState.seciliDers),
-                    icon: Icon(Icons.format_list_bulleted_rounded, color: context.colors.textSecondary),
+                ),
+                // Kart kalan alanı doldurur; ekran kısaysa küçülmek yerine sayfa kayar.
+                SliverFillRemaining(
+                  hasScrollBody: false,
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 4, 20, 16),
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(minHeight: _enAzKartAlani),
+                      child: kartlar.isEmpty
+                          ? _buildTamamlandiWidget(flashkartState.seciliDers)
+                          : _buildKartWidget(kartlar.first, durumlar[kartlar.first.id], _oturumdaTekrar, kartlar.length),
+                    ),
                   ),
-                  SayacRozeti(ikon: const _KartBitkisi(2, true, boyut: 17), deger: '${dueSayilari['hepsi'] ?? 0}', renk: context.colors.warning, semantik: '${dueSayilari['hepsi'] ?? 0} kart tekrar bekliyor'),
-                  const SizedBox(width: 8),
-                  SayacRozeti(ikon: const DamlaIkon(boyut: 15), deger: '$damla', renk: context.colors.water, semantik: '$damla su damlası'),
-                ],
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 4, 20, 0),
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child: Text(context.colors.gece
-                    ? 'Işıklı ipteki desteyi seç; tekrar ettikçe kartların çiçek açar.'
-                    : 'İpteki desteyi seç. Tekrar ettikçe kartların çiçek açar, bahçen için su kazanırsın.',
-                    style: TextStyle(fontSize: 13, color: context.colors.textMuted)),
-              ),
-            ),
-            _sinifSuzgeci(flashkartState.sinif),
-            _askiIpi(flashkartState.seciliDers, dueSayilari),
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 4, 20, 84),
-                child: kartlar.isEmpty
-                    ? _buildTamamlandiWidget(flashkartState.seciliDers)
-                    : _buildKartWidget(kartlar.first, durumlar[kartlar.first.id], _oturumdaTekrar, kartlar.length),
-              ),
-            ),
-          ],
+                ),
+              ],
+            );
+          },
         ),
       ),
     );
   }
+
+  /// Bu yükseklikten kısa ekranlarda açıklama satırı gizlenir.
+  static const double _rahatYukseklik = 760;
+
+  /// Kart + ilerleme çubuğu + düğmeler için ayrılan en küçük yükseklik.
+  static const double _enAzKartAlani = 400;
 
   /// Hazır kartları sınıfa göre süzer (9-11: o sınıfın Maarif konuları).
   Widget _sinifSuzgeci(int? secili) {
@@ -176,6 +192,16 @@ class _FlashkartTabState extends ConsumerState<FlashkartTab> with SingleTickerPr
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
         children: [
+          FilledButton.tonalIcon(
+            onPressed: () => _kartEkleSayfasi(context),
+            icon: const Icon(Icons.add_rounded, size: 20),
+            label: const Text('Kart ekle', style: TextStyle(fontWeight: FontWeight.w800)),
+            style: FilledButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 14),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+            ),
+          ),
+          const SizedBox(width: 8),
           HapSecim(etiket: 'Tüm kartlar', secili: secili == null, onTap: () => sec(null)),
           for (final s in mufredatliSiniflar) ...[
             const SizedBox(width: 8),

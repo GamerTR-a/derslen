@@ -4,7 +4,7 @@ class LiseAuthUser {
   final String id;
   final String name;
   final String email;
-  final String role; // 'student', 'coach', 'parent', 'institution_admin', 'baskan', 'admin'
+  final String role; // 'student', 'teacher', 'parent', 'principal', 'baskan', 'admin' (eski: 'coach')
   final String? grade;
   final String? department;
   final int xp;
@@ -34,13 +34,15 @@ class LiseAuthUser {
   });
 
   bool get isBaskan => role == 'baskan' || isAdmin;
-  bool get isCoach => role == 'coach' || role == 'koc';
+  bool get isCoach => role == 'teacher' || role == 'coach' || role == 'koc';
   bool get isParent => role == 'parent' || role == 'veli';
-  bool get isInstitutionAdmin => role == 'institution_admin' || role == 'admin';
+
+  /// Okul müdürü. Uygulama yöneticisi (admin) değildir.
+  bool get isInstitutionAdmin => role == 'principal' || role == 'institution_admin';
 
   factory LiseAuthUser.fromProfileJson(User user, Map<String, dynamic> profileJson) {
     final role = profileJson['role'] as String? ?? 'student';
-    final isAdminRole = role == 'admin' || role == 'institution_admin';
+    final isAdminRole = role == 'admin';
     return LiseAuthUser(
       id: user.id,
       name: profileJson['name'] as String? ?? user.email?.split('@').first ?? 'Kullanıcı',

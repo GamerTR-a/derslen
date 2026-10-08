@@ -1,9 +1,11 @@
 /// Koç Asistanı sohbet durumu.
 ///
-/// Her mesajda önce niyet bulunur. Bulut yanıtları açıksa (açık rıza +
-/// günlük hak) soru, çalışma özetiyle birlikte `koc-asistan` Edge
-/// Function'ına (Claude) gider; kapalıysa ya da ulaşılamazsa cihaz içi
-/// motor yanıtlar. Program önerileri her zaman cihaz içi motordan gelir ve
+/// Her mesajda önce niyet bulunur. Ders ve sınav soruları önce cihazdaki
+/// kartlar ve YKS rehberinde aranır; güçlü bir eşleşme varsa yanıt cihazdan
+/// verilir (ücretsiz, kotasız). Bulut yanıtları açıksa (açık rıza + günlük
+/// hak) geri kalan sorular, çalışma özeti ve bulunan notlarla birlikte
+/// `koc-asistan` Edge Function'ına (Claude) gider; kapalıysa ya da
+/// ulaşılamazsa cihaz içi motor yanıtlar. Program önerileri her zaman cihaz içi motordan gelir ve
 /// tek dokunuşla uygulanabilir. Sohbet yalnızca bellekte tutulur.
 library;
 
@@ -13,6 +15,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/algorithms/analiz_motoru.dart';
 import '../../core/algorithms/asistan_motoru.dart';
+import '../../core/algorithms/bilgi_motoru.dart';
 import '../../core/algorithms/ders_programi.dart';
 import '../../core/constants/app_constants.dart';
 import '../../core/constants/sinif_mufredati.dart';
@@ -30,6 +33,7 @@ import 'konu_provider.dart';
 import 'mufredat_provider.dart';
 import 'net_provider.dart';
 import 'odak_provider.dart';
+import 'okul_provider.dart';
 import 'ortam_provider.dart';
 import 'plan_provider.dart';
 import 'profil_provider.dart';
@@ -131,13 +135,22 @@ class AsistanNotifier extends StateNotifier<AsistanState> {
     ));
   }
 
+  /// Okul hesabında asistan yalnızca cihaz içi çalışır: öğrencinin verisi
+  /// okulun bilgisi dışında bir yapay zeka servisine gönderilmez.
+  bool get _okulHesabi => _ref.read(okulModuProvider);
+
   Future<void> bulutDurumunuYenile() async {
+    if (_okulHesabi) {
+      state = AsistanState(mesajlar: state.mesajlar, yaziyor: state.yaziyor);
+      return;
+    }
     final d = await AsistanBulutServisi.durum();
     if (d == null || !mounted) return;
     state = state.copyWith(bulutOnay: d.$1, kalanHak: d.$2);
   }
 
   Future<bool> bulutuAc() async {
+    if (_okulHesabi) return false;
     try {
       await AsistanBulutServisi.onayVer();
       await bulutDurumunuYenile();
@@ -157,10 +170,13 @@ class AsistanNotifier extends StateNotifier<AsistanState> {
   /// Hızlı öneri çiplerinden ya da mesajdaki düğmelerden.
   Future<void> niyetCalistir(AsistanNiyet niyet) => gonder(niyetEtiketi(niyet), niyet: niyet);
 
-  Future<void> gonder(String metin, {AsistanNiyet? niyet}) async {
+  /// [bulutZorla]: cihazın yanıtlayabildiği bir ders sorusunu öğrencinin
+  /// isteğiyle yapay zekaya da sorar.
+  Future<void> gonder(String metin, {AsistanNiyet? niyet, bool bulutZorla = false}) async {
     final temiz = metin.trim();
     if (temiz.isEmpty || state.yaziyor) return;
-    final n = niyet ?? niyetBul(temiz);
+    final n = bulutZorla ? AsistanNiyet.dersSorusu : (niyet ?? niyetBul(temiz));
+    final bilgi = n == AsistanNiyet.dersSorusu ? bilgiAra(temiz) : null;
     final gecmis = [
       for (final m in state.mesajlar.skip(state.mesajlar.length > 12 ? state.mesajlar.length - 12 : 0))
         {'rol': m.kullanici ? 'user' : 'assistant', 'metin': m.duzMetin},
@@ -170,7 +186,7 @@ class AsistanNotifier extends StateNotifier<AsistanState> {
 
     try {
       final veri = await _veri();
-      final yerel = await _yerelYanit(n, temiz, veri);
+      final yerel = await _yerelYanit(n, temiz, veri, bilgi);
 
       // Program önerisi, uygulama içi işlemler (test, kart, odak, ses, bahçe,
       // etüt odası) ve ağır durum (kriz) yanıtları her zaman cihazdan: bu
@@ -185,21 +201,40 @@ class AsistanNotifier extends StateNotifier<AsistanState> {
         AsistanNiyet.bahce,
         AsistanNiyet.etutOdasi,
         AsistanNiyet.mola,
+        AsistanNiyet.netHesapla,
       };
-      final yalnizYerel = uygulamaIci.contains(n) || (n == AsistanNiyet.motivasyon && yerel.maddeler.isEmpty);
-      if (!state.bulutAcik || veri == null || yalnizYerel) {
+      // Notlarda güçlü karşılığı olan ders sorusu da cihazdan yanıtlanır;
+      // böylece bulut hakkı yalnızca gerçekten gereken sorulara harcanır.
+      final yalnizYerel = uygulamaIci.contains(n) ||
+          (n == AsistanNiyet.motivasyon && yerel.maddeler.isEmpty) ||
+          (bilgi != null && bilgi.guclu && !bulutZorla);
+      if (!state.bulutAcik || _okulHesabi || veri == null || yalnizYerel) {
         _ekle(AsistanMesaji.yanit(yerel));
         return;
       }
 
       try {
-        final yanit = await AsistanBulutServisi.sor(mesaj: temiz, baglam: veri.baglam, gecmis: gecmis);
-        _ekle(AsistanMesaji(kullanici: false, metin: yanit, aksiyonlar: yerel.aksiyonlar, bulut: true));
+        final yanit = await AsistanBulutServisi.sor(
+          mesaj: temiz,
+          baglam: veri.baglam,
+          gecmis: gecmis,
+          kaynaklar: [
+            if (bilgi != null)
+              for (final e in bilgi.eslesmeler.take(3)) e.belge.kaynakMetni,
+          ],
+        );
+        _ekle(AsistanMesaji(
+          kullanici: false,
+          metin: yanit,
+          aksiyonlar: [for (final a in yerel.aksiyonlar) if (a.bulutSorusu == null) a],
+          bulut: true,
+        ));
         state = state.copyWith(kalanHak: state.kalanHak == null ? null : (state.kalanHak! - 1).clamp(0, 999));
       } on AsistanHatasi catch (e) {
         final not = switch (e.kod) {
           'limit' => 'Bugünkü bulut yanıt hakkın doldu; cihazdaki analizle yanıtladım. Yarın yenilenir.',
           'no_consent' => 'Bulut yanıtları kapalı; cihazdaki analizle yanıtladım.',
+          'busy' => 'Yapay zeka şu an çok yoğun; cihazdaki analizle yanıtladım. Biraz sonra tekrar deneyebilirsin.',
           _ => 'Yapay zeka sunucusuna ulaşılamadı; cihazdaki analizle yanıtladım.',
         };
         if (e.kod == 'no_consent') state = state.copyWith(bulutOnay: false);
@@ -213,9 +248,20 @@ class AsistanNotifier extends StateNotifier<AsistanState> {
     }
   }
 
-  Future<AsistanYaniti> _yerelYanit(AsistanNiyet n, String metin, _AsistanVerisi? v) async {
+  Future<AsistanYaniti> _yerelYanit(AsistanNiyet n, String metin, _AsistanVerisi? v, BilgiSonucu? bilgi) async {
     // Profilden bağımsız çalışabilenler.
     switch (n) {
+      case AsistanNiyet.dersSorusu:
+        return bilgiYaniti(
+          mesaj: metin,
+          sonuc: bilgi ?? bilgiAra(metin),
+          havuzDersleri: _havuzDersleri,
+          bulutAcik: state.bulutAcik && v != null,
+          kalanGun: _ref.read(serbestModProvider) ? null : yksKalanGun(),
+        );
+      case AsistanNiyet.netHesapla:
+        final (d, y) = mesajdakiDogruYanlis(metin) ?? (0, 0);
+        return netHesabiYaniti(d, y);
       case AsistanNiyet.arkaPlanSesi:
         return _sesYaniti(metin);
       case AsistanNiyet.etutOdasi:
@@ -336,10 +382,14 @@ class AsistanNotifier extends StateNotifier<AsistanState> {
             AsistanNiyet.bahce ||
             AsistanNiyet.mola ||
             AsistanNiyet.kartTekrar ||
-            AsistanNiyet.motivasyon:
+            AsistanNiyet.motivasyon ||
+            AsistanNiyet.dersSorusu ||
+            AsistanNiyet.netHesapla:
         return yardimYaniti(bulutAcik: state.bulutAcik);
     }
   }
+
+  static final Set<String> _havuzDersleri = {for (final s in soruHavuzu) s.ders};
 
   /// Mesajda adı geçen arka plan sesini bulur; yoksa zaman ve duruma göre öneri.
   AsistanYaniti _sesYaniti(String metin) {

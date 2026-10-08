@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../../core/services/secure_screen_service.dart';
 import '../../providers/test_provider.dart';
 import '../../widgets/empty_state_widget.dart';
 import 'package:yks_kocu/core/theme/theme_extensions.dart';
@@ -22,6 +23,8 @@ class _TestCozScreenState extends ConsumerState<TestCozScreen> {
   @override
   void initState() {
     super.initState();
+    // ignore: discarded_futures
+    SecureScreenService.ekraniAcikTut(true, sahip: 'test');
     _timer = Timer.periodic(const Duration(seconds: 1), (_) {
       if (!mounted) return;
       ref.read(aktifTestProvider.notifier).saniyeArtir();
@@ -33,6 +36,8 @@ class _TestCozScreenState extends ConsumerState<TestCozScreen> {
   @override
   void dispose() {
     _timer?.cancel();
+    // ignore: discarded_futures
+    SecureScreenService.ekraniAcikTut(false, sahip: 'test');
     super.dispose();
   }
 

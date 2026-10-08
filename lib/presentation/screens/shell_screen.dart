@@ -7,6 +7,7 @@ import '../../core/services/secure_screen_service.dart';
 import '../providers/bahce_provider.dart';
 import '../providers/flashkart_provider.dart';
 import '../providers/odak_provider.dart';
+import '../providers/okul_provider.dart';
 import '../widgets/asistan_widget.dart';
 
 const List<String> _sekmeRotalari = ['/ana', '/calis', '/flashkart', '/bahce', '/topluluk'];
@@ -28,6 +29,8 @@ class ShellScreen extends ConsumerWidget {
     final due = ref.watch(desteDueSayilariProvider)['hepsi'] ?? 0;
     final susuz = ref.watch(bahceProvider.select((b) => b.susuzBitki));
     final odak = ref.watch(odakProvider);
+    final okulModu = ref.watch(okulModuProvider);
+    final bekleyenOneri = ref.watch(ogrenciOnerileriProvider).value?.where((o) => o.durum == null).length ?? 0;
 
     String? calisRozeti;
     if (odak.aktif && selectedIndex != 1) {
@@ -97,11 +100,18 @@ class ShellScreen extends ConsumerWidget {
               selectedIcon: Icon(Icons.local_florist_rounded, color: context.colors.primary),
               label: 'Bahçe',
             ),
-            NavigationDestination(
-              icon: ikon(Icons.groups_outlined),
-              selectedIcon: Icon(Icons.groups_rounded, color: context.colors.primary),
-              label: 'Topluluk',
-            ),
+            if (okulModu)
+              NavigationDestination(
+                icon: ikon(Icons.school_outlined, etiket: bekleyenOneri > 0 ? '$bekleyenOneri' : null),
+                selectedIcon: Icon(Icons.school_rounded, color: context.colors.primary),
+                label: 'Okulum',
+              )
+            else
+              NavigationDestination(
+                icon: ikon(Icons.groups_outlined),
+                selectedIcon: Icon(Icons.groups_rounded, color: context.colors.primary),
+                label: 'Topluluk',
+              ),
           ],
         ),
       ),

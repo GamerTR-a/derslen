@@ -101,6 +101,7 @@ class OdakNotifier extends StateNotifier<OdakState> {
   Timer? _timer;
   DateTime? _segmentBaslangic;
   int _segmentOncesiSaniye = 0;
+  int _tikSayisi = 0;
 
   /// Sunucudaki oturum satırının oluştuğunun öğrenildiği an (sunucu
   /// damgası bundan önce ya da aynı andadır).
@@ -223,6 +224,11 @@ class OdakNotifier extends StateNotifier<OdakState> {
   void _tik() {
     final bas = _segmentBaslangic;
     if (bas == null || !mounted) return;
+    // Ekranı açık tutma ayarı herhangi bir nedenle kaybolursa en geç 15 sn'de geri gelir.
+    if (++_tikSayisi % 15 == 0) {
+      // ignore: discarded_futures
+      SecureScreenService.ekraniAcikTut(true);
+    }
     final gecen = _segmentOncesiSaniye + DateTime.now().difference(bas).inSeconds;
     state = state.copyWith(gecenSaniye: gecen.clamp(0, state.hedefSaniye));
     if (gecen >= state.hedefSaniye) bitir();
@@ -231,7 +237,10 @@ class OdakNotifier extends StateNotifier<OdakState> {
   /// Uygulama ön plana dönünce çağrılır: arka planda duran sayaç hemen
   /// gerçek süreye getirilir (süre dolduysa seans kaydedilir).
   void onPlanaDonuldu() {
-    if (state.asama == OdakAsama.calisiyor) _tik();
+    if (state.asama != OdakAsama.calisiyor) return;
+    // ignore: discarded_futures
+    SecureScreenService.ekraniAcikTut(true);
+    _tik();
   }
 
   void duraklat() {

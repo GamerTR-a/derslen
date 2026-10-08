@@ -3,6 +3,16 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../presentation/providers/auth_provider.dart';
+import '../../presentation/providers/okul_provider.dart';
+import '../algorithms/okul_hesaplari.dart';
+import '../../presentation/screens/auth/karsilama_screen.dart';
+import '../../presentation/screens/auth/rol_kodu_screen.dart';
+import '../../presentation/screens/okul/mudur_paneli.dart';
+import '../../presentation/screens/okul/ogrenci_detay_screen.dart';
+import '../../presentation/screens/okul/ogretmen_paneli.dart';
+import '../../presentation/screens/okul/okulum_screen.dart';
+import '../../presentation/screens/okul/sube_detay_screen.dart';
+import '../../presentation/screens/okul/veli_paneli.dart';
 import '../../presentation/screens/auth/login_screen.dart';
 import '../../presentation/screens/auth/register_screen.dart';
 import '../../presentation/screens/auth/email_verification_screen.dart';
@@ -106,6 +116,8 @@ class _AuthRefreshListenable extends ChangeNotifier {
   }
 }
 
+const List<String> _aciKToplulukRotalari = ['/study-rooms', '/etut-odasi', '/create-post'];
+
 final routerProvider = Provider<GoRouter>((ref) {
   final refreshListenable = _AuthRefreshListenable(ref);
 
@@ -155,7 +167,8 @@ final routerProvider = Provider<GoRouter>((ref) {
       final status = authState.status;
       final loc = state.matchedLocation;
 
-      final isAuthRoute = loc == '/login' ||
+      final isAuthRoute = loc == '/karsilama' ||
+          loc == '/login' ||
           loc == '/register' ||
           loc == '/verify-email' ||
           loc == '/sifremi-unuttum';
@@ -168,7 +181,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       }
 
       if (status == AuthStatus.unauthenticated) {
-        if (!isAuthRoute) return '/login';
+        if (!isAuthRoute) return '/karsilama';
         return null;
       }
 
@@ -178,13 +191,19 @@ final routerProvider = Provider<GoRouter>((ref) {
       }
 
       if (status == AuthStatus.onboardingPending) {
-        if (loc != '/onboarding') return '/onboarding';
+        // Veli, öğretmen ya da müdür olarak kaydolan kişi öğrenci profili
+        // yerine kod ekranına gider.
+        final hedef = ref.read(authProvider.notifier).kayitTuru == null ? '/onboarding' : '/rol-kodu';
+        if (loc != hedef) return hedef;
         return null;
       }
 
       if (status == AuthStatus.authenticated) {
-        if (isAuthRoute || loc == '/onboarding' || loc == '/acilis') return '/ana';
-        return null;
+        final panel = authState.panel;
+        if (isAuthRoute || loc == '/onboarding' || loc == '/acilis' || loc == '/rol-kodu') return panel.ev;
+        // Okul hesabında açık topluluk ekranları kapalıdır (sunucu da engeller).
+        if (ref.read(okulModuProvider) && _aciKToplulukRotalari.any(loc.startsWith)) return '/topluluk';
+        return panelYonlendirmesi(panel, loc);
       }
 
       return null;
@@ -199,8 +218,46 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const LoginScreen(),
       ),
       GoRoute(
+        path: '/karsilama',
+        builder: (context, state) => const KarsilamaScreen(),
+      ),
+      GoRoute(
         path: '/register',
-        builder: (context, state) => const RegisterScreen(),
+        builder: (context, state) => RegisterScreen(tur: state.uri.queryParameters['tur']),
+      ),
+      GoRoute(
+        path: '/rol-kodu',
+        builder: (context, state) => const RolKoduScreen(),
+      ),
+      GoRoute(
+        path: '/ogretmen',
+        builder: (context, state) => const OgretmenPaneli(),
+      ),
+      GoRoute(
+        path: '/veli',
+        builder: (context, state) => const VeliPaneli(),
+      ),
+      GoRoute(
+        path: '/mudur',
+        builder: (context, state) => const MudurPaneli(),
+      ),
+      GoRoute(
+        path: '/okul/sube/:id',
+        builder: (context, state) => SubeDetayScreen(
+          subeId: state.pathParameters['id'] ?? '',
+          etiket: state.extra as String?,
+        ),
+      ),
+      GoRoute(
+        path: '/okul/ogrenci/:id',
+        builder: (context, state) => OgrenciDetayScreen(
+          ogrenciId: state.pathParameters['id'] ?? '',
+          ad: state.extra as String?,
+        ),
+      ),
+      GoRoute(
+        path: '/okulum',
+        builder: (context, state) => const OkulumScreen(),
       ),
       GoRoute(
         path: '/verify-email',

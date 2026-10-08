@@ -11,6 +11,7 @@ import '../../providers/bahce_provider.dart';
 import '../../providers/konu_provider.dart';
 import '../../providers/mufredat_provider.dart';
 import '../../providers/net_provider.dart';
+import '../../providers/okul_provider.dart';
 import '../../providers/plan_provider.dart';
 import '../../providers/profil_provider.dart';
 import '../../providers/role_provider.dart';
@@ -114,6 +115,7 @@ class AnaSayfaTab extends ConsumerWidget {
               const _BugunKarti(),
               const SizedBox(height: 12),
               const _SiradakiBloklar(),
+              const _OgretmenOnerisi(),
               const SizedBox(height: 20),
               BolumBasligi('Bu haftanın gidişatı', aksiyon: 'Analiz', onAksiyon: () => context.push('/analiz')),
               const _HaftaGidisati(),
@@ -282,6 +284,53 @@ class _BugunKarti extends ConsumerWidget {
           ),
           Icon(Icons.chevron_right_rounded, color: c.textMuted),
         ],
+      ),
+    );
+  }
+}
+
+/// Okul hesabında: öğretmenin şubeye gönderdiği, henüz programa eklenmemiş öneriler.
+class _OgretmenOnerisi extends ConsumerWidget {
+  const _OgretmenOnerisi();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final c = context.colors;
+    final bekleyen = (ref.watch(ogrenciOnerileriProvider).value ?? const []).where((o) => o.durum == null).toList();
+    if (bekleyen.isEmpty) return const SizedBox.shrink();
+    final ilk = bekleyen.first;
+    return Padding(
+      padding: const EdgeInsets.only(top: 12),
+      child: YumusakKart(
+        padding: const EdgeInsets.fromLTRB(16, 12, 8, 12),
+        onTap: () => context.push('/okulum'),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(9),
+              decoration: BoxDecoration(color: c.primarySoft, borderRadius: BorderRadius.circular(12)),
+              child: Icon(Icons.assignment_outlined, size: 20, color: c.gece ? c.accent : c.primary),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    bekleyen.length == 1 ? 'Öğretmeninden bir öneri var' : 'Öğretmenlerinden ${bekleyen.length} öneri var',
+                    style: TextStyle(fontWeight: FontWeight.w800, color: c.textPrimary),
+                  ),
+                  const SizedBox(height: 2),
+                  Text('${ilk.ders}: ${ilk.konu} (${ilk.sureDk} dk)',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(fontSize: 13, color: c.textSecondary)),
+                ],
+              ),
+            ),
+            Icon(Icons.chevron_right_rounded, color: c.textMuted),
+          ],
+        ),
       ),
     );
   }

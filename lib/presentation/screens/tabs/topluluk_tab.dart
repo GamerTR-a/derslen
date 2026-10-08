@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/services/supabase_data_service.dart';
 import '../../../data/models/post.dart';
@@ -6,13 +7,17 @@ import '../../widgets/empty_state_widget.dart';
 import '../../widgets/ui_kit.dart';
 import '../../cizimler/sahne_boyaci.dart';
 import '../etut/etut_odalari_screen.dart';
+import '../okul/okulum_screen.dart';
+import '../../providers/okul_provider.dart';
 import 'package:yks_kocu/core/theme/theme_extensions.dart';
 
-class ToplulukTab extends StatelessWidget {
+class ToplulukTab extends ConsumerWidget {
   const ToplulukTab({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    // Okul hesabında açık topluluk kapalıdır; yerine sınıf bölümü gelir.
+    if (ref.watch(okulModuProvider)) return const OkulumScreen(gomulu: true);
     return DefaultTabController(
       length: 2,
       child: Scaffold(

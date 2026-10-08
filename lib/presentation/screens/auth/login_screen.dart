@@ -254,7 +254,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with SecureScreenMixi
                         style: TextStyle(color: colors.textMuted),
                       ),
                       GestureDetector(
-                        onTap: () => context.go('/register'),
+                        onTap: () => context.go('/karsilama'),
                         child: Text(
                           'Kayıt Ol',
                           style: TextStyle(

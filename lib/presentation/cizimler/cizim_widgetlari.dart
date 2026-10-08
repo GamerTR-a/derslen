@@ -283,6 +283,9 @@ class UrunCizimi extends StatelessWidget {
     if (urunId.startsWith('seed_')) {
       return Cizim(bitkiSvg(urunId, 3, gece: gece), width: boyut * 0.8, height: boyut);
     }
+    if (urunId.startsWith('yerli_')) {
+      return Cizim(yerliBitkiSvg(urunId.substring(6), gece: gece), width: boyut * 0.8, height: boyut);
+    }
     if (urunId.startsWith('pot_')) {
       return Cizim(saksiSvg(gece: gece), width: boyut, height: boyut * 0.55);
     }

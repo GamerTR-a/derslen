@@ -16,6 +16,7 @@ import '../../data/models/plan_blok.dart';
 import '../constants/app_constants.dart';
 import '../utils/tarih.dart';
 import 'analiz_motoru.dart';
+import 'bilgi_motoru.dart';
 import 'ders_programi.dart';
 
 enum AsistanNiyet {
@@ -35,6 +36,12 @@ enum AsistanNiyet {
   mola,
   etutOdasi,
   motivasyon,
+
+  /// Ders ya da sınav hakkında bilgi sorusu ("mitoz nedir", "TYT kaç soru").
+  dersSorusu,
+
+  /// "40 doğru 12 yanlış kaç net".
+  netHesapla,
   yardim,
 }
 
@@ -86,22 +93,34 @@ class AsistanAksiyon {
   final DersProgramiAyar? programAyari;
   final AsistanKomut? komut;
 
+  /// Cihazın yanıtladığı soruyu bulut yapay zekasına da sormak için.
+  final String? bulutSorusu;
+
   const AsistanAksiyon.rota(this.etiket, String this.rota)
       : niyet = null,
         programAyari = null,
-        komut = null;
+        komut = null,
+        bulutSorusu = null;
   const AsistanAksiyon.niyet(this.etiket, AsistanNiyet this.niyet)
       : rota = null,
         programAyari = null,
-        komut = null;
+        komut = null,
+        bulutSorusu = null;
   const AsistanAksiyon.programUygula(this.etiket, DersProgramiAyar this.programAyari)
       : rota = null,
         niyet = null,
-        komut = null;
+        komut = null,
+        bulutSorusu = null;
   const AsistanAksiyon.komut(this.etiket, AsistanKomut this.komut)
       : rota = null,
         niyet = null,
-        programAyari = null;
+        programAyari = null,
+        bulutSorusu = null;
+  const AsistanAksiyon.bulutaSor(this.etiket, String this.bulutSorusu)
+      : rota = null,
+        niyet = null,
+        programAyari = null,
+        komut = null;
 }
 
 class AsistanYaniti {
@@ -124,7 +143,27 @@ String turkceKucuk(String s) => s
     .replaceAll('î', 'i')
     .replaceAll('û', 'u');
 
+/// Mesajın niyeti. Uygulama özellikleri anahtar kelimelerle, ders ve sınav
+/// soruları cihaz içi bilgi aramasıyla ([bilgiAra]) tanınır.
 AsistanNiyet niyetBul(String mesaj) {
+  final anahtar = _anahtarNiyeti(mesaj);
+  // Kaygı ve kriz mesajları her zaman önce gelir.
+  if (anahtar == AsistanNiyet.motivasyon) return anahtar;
+  if (mesajdakiDogruYanlis(mesaj) != null) return AsistanNiyet.netHesapla;
+  final soruKalibi = bilgiSorusuMu(mesaj);
+  final bilgi = bilgiAra(mesaj);
+  // Soru bir konu başlığının kendisiyse ("kalan teoremi") anahtar kelimeye bakılmaz.
+  if (bilgi.tamBaslik) return AsistanNiyet.dersSorusu;
+  if (!soruKalibi) return anahtar == AsistanNiyet.yardim && bilgi.guclu ? AsistanNiyet.dersSorusu : anahtar;
+  // "Bitki hücresi ile hayvan hücresi farkı" bahçe komutu değil, konu sorusudur;
+  // "etüt odası nedir" ise notlarda karşılığı olmadığı için komut kalır.
+  if (bilgi.yeterli || anahtar == AsistanNiyet.yardim || (acikBilgiSorusuMu(mesaj) && bilgi.kapsama >= 0.4)) {
+    return AsistanNiyet.dersSorusu;
+  }
+  return anahtar;
+}
+
+AsistanNiyet _anahtarNiyeti(String mesaj) {
   final m = turkceKucuk(mesaj);
   bool var_(List<String> kelimeler) => kelimeler.any(m.contains);
 
@@ -489,6 +528,9 @@ AsistanYaniti yardimYaniti({required bool bulutAcik}) {
         ? 'Bana derslerinle, denemelerinle ya da çalışma programınla ilgili her şeyi sorabilirsin. Örneğin:'
         : 'Şu an cihazdaki analizlerle çalışıyorum. Şunları yapabilirim:',
     maddeler: const [
+      '"Mitoz nedir?", "Tanzimat Fermanı", "diskriminant formülü": hazır notlardan konu özeti',
+      '"TYT kaç soru?", "Puan nasıl hesaplanır?", "Paragrafta nasıl hızlanırım?": YKS rehberi',
+      '"30 doğru 6 yanlış kaç net?": net hesabı',
       '"Son denememi analiz et" ya da "deneme ekle": net değişimi, güçlü/zayıf ders, boş-yanlış yorumu',
       '"Hedefim 90 net, yetişir mi?": gidişatına göre sınav günü tahmini',
       '"Programımı iyileştir" / "Bugün ne çalışayım?": uygulanabilir program önerisi',
@@ -857,5 +899,87 @@ AsistanYaniti molaYaniti({required int gecenDakika}) {
       AsistanAksiyon.rota('Zihin Açıcı oyunlar', '/mini-oyunlar'),
       AsistanAksiyon.niyet('Odak seansı başlat', AsistanNiyet.odakBaslat),
     ],
+  );
+}
+
+// ─── Ders ve sınav bilgisi ────────────────────────────────────
+
+/// Kart destesi → soru havuzundaki ders adı (test başlatma düğmesi için).
+const _desteTestDersi = {
+  'matematik': 'Matematik',
+  'geometri': 'Geometri',
+  'fizik': 'Fizik',
+  'kimya': 'Kimya',
+  'biyoloji': 'Biyoloji',
+  'tarih': 'Tarih',
+  'cografya': 'Coğrafya',
+  'edebiyat': 'Türk Dili ve Edebiyatı',
+  'felsefe': 'Felsefe',
+  'turkce': 'Türkçe',
+  'din': 'Din Kültürü',
+};
+
+String _kisalt(String s, int uzunluk) {
+  final tek = s.replaceAll('\n', ' ');
+  return tek.length <= uzunluk ? tek : '${tek.substring(0, uzunluk).trimRight()}…';
+}
+
+/// Cihazdaki kartlar ve YKS rehberinden bilgi yanıtı. [havuzDersleri] soru
+/// havuzunda sorusu olan derslerdir; [bulutAcik] ise yanıtın altına aynı
+/// soruyu yapay zekaya sorma düğmesi eklenir.
+AsistanYaniti bilgiYaniti({
+  required String mesaj,
+  required BilgiSonucu sonuc,
+  Set<String> havuzDersleri = const {},
+  bool bulutAcik = false,
+  int? kalanGun,
+}) {
+  final b = sonuc.enIyi;
+  if (b == null || !sonuc.yeterli) {
+    return AsistanYaniti(
+      bulutAcik
+          ? 'Bu soruya cihazdaki notlarımda net bir yanıt bulamadım.'
+          : 'Bu soruya cihazdaki notlarımda net bir yanıt bulamadım. Soruyu konu adıyla kısaca yazmayı dene (ör. "mitoz", "üslü sayılar kuralları"). '
+              'Yapay zeka yanıtlarını sağ üstteki anahtardan açarsan daha serbest sorular da sorabilirsin.',
+      maddeler: [
+        for (final e in sonuc.eslesmeler.take(3)) 'Belki şunu arıyorsun: ${e.belge.baslik} (${e.belge.dersEtiketi})',
+      ],
+      aksiyonlar: const [AsistanAksiyon.rota('Kartlarda ara', '/flashkart')],
+    );
+  }
+
+  final rehber = b.kaynak == BilgiKaynagi.rehber;
+  final maddeler = <String>[
+    if (rehber) ...b.maddeler else ...b.metin.split('\n').map((s) => s.trim()).where((s) => s.isNotEmpty),
+    if (b.ipucu != null && b.ipucu!.isNotEmpty) 'Akılda tut: ${b.ipucu}',
+    if (b.id == 'takvim' && kalanGun != null) 'Uygulamadaki geri sayıma göre sınava $kalanGun gün var.',
+    for (final e in sonuc.eslesmeler.skip(1).take(3))
+      if (e.belge.kaynak == BilgiKaynagi.kart) 'İlgili: ${e.belge.baslik} — ${_kisalt(e.belge.metin, 120)}',
+  ];
+  final testDersi = _desteTestDersi[b.ders];
+  return AsistanYaniti(
+    rehber ? b.metin : '${b.baslik} (${[b.dersEtiketi, ?b.unite].join(' · ')})',
+    maddeler: maddeler,
+    aksiyonlar: [
+      if (b.rota != null) AsistanAksiyon.rota(b.rota!.$1, b.rota!.$2),
+      if (b.ders != null) AsistanAksiyon.komut('${b.dersEtiketi} kartlarını aç', AsistanKomut.deste(b.ders!)),
+      if (testDersi != null && havuzDersleri.contains(testDersi))
+        AsistanAksiyon.komut('$testDersi testi çöz', AsistanKomut.test(testDersi)),
+      if (bulutAcik) AsistanAksiyon.bulutaSor('Yapay zeka daha ayrıntılı anlatsın', mesaj),
+    ],
+  );
+}
+
+/// "40 doğru 12 yanlış" için net hesabı.
+AsistanYaniti netHesabiYaniti(int dogru, int yanlis) {
+  final net = dogru - yanlis / 4;
+  return AsistanYaniti(
+    '$dogru doğru, $yanlis yanlış = ${_n(net)} net.',
+    maddeler: [
+      'Net = Doğru − Yanlış ÷ 4 ⟹ $dogru − ${_n(yanlis / 4)} = ${_n(net)}',
+      if (yanlis >= 4) 'Yanlışların ${_n(yanlis / 4)} net götürdü; emin olmadığın sorularda iki şıkka indiremiyorsan boş bırakmak daha kârlı.',
+      'Denemeyi Netler ekranına girersen gidişatını ve ders ders net kaybını çıkarırım.',
+    ],
+    aksiyonlar: const [AsistanAksiyon.rota('Deneme ekle', '/netler')],
   );
 }

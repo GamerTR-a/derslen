@@ -813,11 +813,13 @@ class AsistanBulutServisi {
   static Future<void> onayGeriAl() async => _db?.rpc('asistan_onay_geri_al');
 
   /// Soruyu, öğrencinin çalışma özetini ve son sohbet turlarını gönderir;
-  /// asistanın yanıt metnini döner.
+  /// asistanın yanıt metnini döner. [kaynaklar] cihazdaki notlardan soruyla
+  /// eşleşen kart/rehber metinleridir; yanıtın bunlara dayanması istenir.
   static Future<String> sor({
     required String mesaj,
     required Map<String, dynamic> baglam,
     required List<Map<String, String>> gecmis,
+    List<String> kaynaklar = const [],
   }) async {
     final db = _db;
     if (db == null || db.auth.currentUser == null) throw const AsistanHatasi('unauthorized');
@@ -826,6 +828,7 @@ class AsistanBulutServisi {
         'mesaj': mesaj,
         'baglam': baglam,
         'gecmis': gecmis,
+        if (kaynaklar.isNotEmpty) 'kaynaklar': kaynaklar,
       });
       final data = yanit.data;
       if (data is Map && data['yanit'] is String) return data['yanit'] as String;

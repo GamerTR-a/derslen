@@ -80,6 +80,8 @@ class _AsistanSohbetSheetState extends ConsumerState<AsistanSohbetSheet> {
       } else {
         router.push(rota);
       }
+    } else if (a.bulutSorusu != null) {
+      n.gonder(a.bulutSorusu!, bulutZorla: true);
     } else if (a.programAyari != null) {
       n.programiUygula(a.programAyari!);
     } else if (a.niyet != null) {
@@ -235,7 +237,7 @@ class _AsistanSohbetSheetState extends ConsumerState<AsistanSohbetSheet> {
                       onSubmitted: (_) => _gonder(),
                       decoration: InputDecoration(
                         counterText: '',
-                        hintText: s.bulutAcik ? 'Bir soru sor…' : 'Deneme, test, kartlar, odak, ses…',
+                        hintText: s.bulutAcik ? 'Bir soru sor…' : 'Konu sorusu, deneme, test, odak…',
                         filled: true,
                         fillColor: c.surface,
                         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -264,7 +266,7 @@ class _AsistanSohbetSheetState extends ConsumerState<AsistanSohbetSheet> {
         AsistanKomutTur.desteAc => Icons.style_rounded,
         AsistanKomutTur.odakBaslat => Icons.play_arrow_rounded,
         AsistanKomutTur.sesCal => Icons.graphic_eq_rounded,
-        null => Icons.auto_fix_high_rounded,
+        null => a.bulutSorusu != null ? Icons.auto_awesome_rounded : Icons.auto_fix_high_rounded,
       };
 
   Widget _yaziyor(BuildContext context) {

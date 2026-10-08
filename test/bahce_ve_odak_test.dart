@@ -29,7 +29,8 @@ void main() {
         damla: 7,
         envanter: {'seed_lale': 2},
         dekorlar: ['deco_bank'],
-        orman: ['seed_kiraz'],
+        iklim: 'akdeniz',
+        ormanlar: {'akdeniz': ['seed_kiraz'], 'tayga': ['seed_cam']},
         hediyeKutusuAcildi: true,
       );
       final geri = BahceState.fromJson(durum.toJson());
@@ -39,7 +40,9 @@ void main() {
       expect(geri.damla, 7);
       expect(geri.envanter, {'seed_lale': 2});
       expect(geri.dekorlar, ['deco_bank']);
-      expect(geri.orman, ['seed_kiraz']);
+      expect(geri.iklim, 'akdeniz');
+      expect(geri.aktifOrman, ['seed_kiraz']);
+      expect(geri.orman, ['seed_kiraz', 'seed_cam']);
       expect(geri.hediyeKutusuAcildi, isTrue);
     });
   });

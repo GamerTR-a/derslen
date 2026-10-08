@@ -51,6 +51,16 @@ Deneme adını yazdığın sonuçlar, aynı denemeyi çözen diğer kullanıcıl
 ### h. Hata Kayıtları
 - Uygulama beklenmedik bir hatayla karşılaşırsa hatanın türü, teknik izi (stack trace), uygulama sürümü ve platform (Android/iOS) hesabınla ilişkili olarak sunucumuza kaydedilir. Bu kayıtlar yalnızca hataları gidermek için kullanılır, üçüncü taraf bir hata izleme hizmetine gönderilmez.
 
+### i. Okul ve Veli Paylaşımı
+Bu paylaşım yalnızca sen başlatırsan gerçekleşir: bir şube koduyla okulundaki sınıfına katıldığında ya da kendi ürettiğin kodu veline verdiğinde.
+- **Paylaşılan veriler:** Odak sayacıyla ölçülen çalışma süren ve hangi derse çalıştığın, program uyumun, konu ilerlemen, uygulamaya girdiğin deneme netleri ve uygulama içi test sonuçların.
+- **Kim görür:** Şubenin rehber öğretmeni bu verilerin tamamını, branş öğretmeni yalnızca kendi dersine ait olanları, velin haftalık özetini görür. Okul müdürü yalnızca şube toplamlarını görür; adına bağlı veri görmez.
+- **Paylaşılmayan veriler:** Ruh hâli kayıtların, koç asistanıyla sohbetlerin, bahçen, oyunların ve kişisel notların hiçbir öğretmen, veli ya da yöneticiyle paylaşılmaz.
+- **Rehber öğretmen notları:** Rehber öğretmenin seninle yaptığı görüşmeye dair yazdığı notlar yalnızca şubenin rehber öğretmenlerine açıktır.
+- **Okul hesabında topluluk ve asistan:** Bir okulun şubesine kayıtlıyken açık topluluk akışı ve herkese açık etüt odaları kapalıdır; koç asistanı yalnızca cihaz içi çalışır, yapay zeka (bulut) yanıtları kullanılamaz.
+- **Sonlandırma:** Profil › Okulum ve velim bölümünden sınıftan ayrılabilir, veli bağlantısını kaldırabilirsin. Ayrıldığında öğretmenlerin ve velin verilerine erişemez. Paylaşım için tutulan özet kayıtların ve rehber öğretmen notları da silinir.
+- Okulun aracılığıyla kullanılan hesaplarda okul, öğrencilerinin bu verileri bakımından veri sorumlusu olarak hareket eder; 18 yaşından küçük öğrenciler için veli onayını okul alır.
+
 ## 3. İşleme Amaçları ve Hukuki Sebepler
 
 1. Hesabını oluşturmak ve güvenli oturum sağlamak (KVKK m.5/2-c: sözleşmenin ifası).

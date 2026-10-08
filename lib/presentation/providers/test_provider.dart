@@ -477,4 +477,28 @@ Future<void> testGecmisineEkle(StorageService storage, AktifTestState test) asyn
   }
   if (items.length > 500) items.removeRange(0, items.length - 500);
   await storage.setMap(AnalizKayitlari.testGecmisi, {'items': items});
+  await testKonuKaydinaEkle(storage, test);
+}
+
+/// Biten testin sonucunu konu bazında günlük kayda ekler. Öğretmen panelindeki
+/// "şubenin zorlandığı konular" görünümü bu kayıttan beslenir.
+Future<void> testKonuKaydinaEkle(StorageService storage, AktifTestState test, {DateTime? simdi}) async {
+  if (test.sorular.isEmpty) return;
+  final bugun = gunAnahtari(simdi ?? DateTime.now());
+  final kayit = eskiKayitlariBudanmis(await storage.getMap(AnalizKayitlari.testKonu) ?? {}, gun: 60);
+  final gun = Map<String, dynamic>.from((kayit[bugun] as Map?) ?? const {});
+  for (var i = 0; i < test.sorular.length; i++) {
+    final s = test.sorular[i];
+    final konu = s.konu.trim().isEmpty ? 'Genel' : s.konu.trim();
+    final anahtar = '${dersAdiNormalize(s.ders)}>$konu';
+    final sayilar = [for (final v in (gun[anahtar] as List?) ?? const [0, 0, 0]) (v as num).toInt()];
+    while (sayilar.length < 3) {
+      sayilar.add(0);
+    }
+    final c = test.cevaplar[i];
+    sayilar[c == null ? 2 : (c == s.dogruSecenek ? 0 : 1)]++;
+    gun[anahtar] = sayilar;
+  }
+  kayit[bugun] = gun;
+  await storage.setMap(AnalizKayitlari.testKonu, kayit);
 }
